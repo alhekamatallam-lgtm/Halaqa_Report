@@ -42,20 +42,15 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
   const availableCircles = useMemo(() => {
     if (!selectedTeacher) return [];
     
-    const evaluatedCircleNames = new Set(evaluationData.map(e => e.circleName));
     const circleSet = new Set(
         students
             .filter(s => s.teacherName === selectedTeacher && s.circle)
             .map(s => s.circle)
     );
     
-    const unevaluatedCircles = Array.from(circleSet).filter(
-        circle => !evaluatedCircleNames.has(circle)
-    );
-
     // FIX: Explicitly typing the sort callback parameters as string to fix 'unknown' type error.
-    return unevaluatedCircles.sort((a: string, b: string) => a.localeCompare(b, 'ar'));
-  }, [students, selectedTeacher, evaluationData]);
+    return Array.from(circleSet).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+  }, [students, selectedTeacher]);
 
   useEffect(() => {
     setSelectedCircle('');
@@ -145,11 +140,6 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
                   <option key={circle} value={circle}>{circle}</option>
                 ))}
               </select>
-              {selectedTeacher && availableCircles.length === 0 && (
-                <p className="text-xs text-stone-500 mt-1">
-                  جميع حلقات هذا المعلم قد تم تقييمها.
-                </p>
-              )}
             </div>
 
             <hr className="my-4 border-t-2 border-stone-100" />
