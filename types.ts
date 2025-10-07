@@ -55,6 +55,11 @@ export interface CircleReportData {
   totalPoints: number;
 }
 
+export interface ExcellenceReportData extends CircleReportData {
+    excellenceScore: number;
+    rank: number;
+}
+
 export interface GeneralReportStats {
   totalCircles: number;
   totalStudents: number;

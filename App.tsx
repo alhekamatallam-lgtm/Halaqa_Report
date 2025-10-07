@@ -5,6 +5,7 @@ import GeneralReportPage from './pages/GeneralReportPage';
 import DashboardPage from './pages/DashboardPage';
 import NotesPage from './pages/NotesPage';
 import EvaluationPage from './pages/EvaluationPage';
+import ExcellencePage from './pages/ExcellencePage';
 import PasswordModal from './components/PasswordModal';
 import { Nav } from './components/Nav';
 import Notification from './components/Notification';
@@ -163,7 +164,7 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
     return Array.from(studentsMap.values());
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -313,7 +314,8 @@ const App: React.FC = () => {
         general: 'التقرير العام والشامل',
         dashboard: 'لوحة متابعة الحلقات',
         notes: 'ملاحظات الطلاب',
-        evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`
+        evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
+        excellence: 'منصة تميز الحلقات'
     };
 
     const renderPage = () => {
@@ -328,6 +330,8 @@ const App: React.FC = () => {
                 return <DashboardPage students={students} onCircleSelect={handleCircleSelect} />;
             case 'notes':
                 return <NotesPage students={students} />;
+            case 'excellence':
+                return <ExcellencePage students={students} />;
             case 'evaluation':
                  if (!authenticatedUser) return null;
                 return (
@@ -349,8 +353,8 @@ const App: React.FC = () => {
             <Notification notification={notification} onClose={() => setNotification(null)} />
             <header className="bg-stone-800 text-white shadow-lg pb-4">
                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-center pt-6">
-                        <img src="https://i.ibb.co/L5x1y21/logo.png" alt="شعار الراجحي" className="h-20" />
+                    <div className="text-center pt-6">
+                        <h2 className="text-2xl font-semibold text-stone-200">مجمع الراجحي بشبرا</h2>
                     </div>
                     <h1 className="text-3xl font-bold leading-tight text-center text-amber-400 pt-2 pb-6" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.5)'}}>
                        {titles[currentPage]}

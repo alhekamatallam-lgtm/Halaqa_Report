@@ -18,3 +18,9 @@ export const SortDownIcon: React.FC<{ className?: string }> = ({ className = 'w-
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
   </svg>
 );
+
+export const CrownIcon: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2L9.16 8.34L2 9.5L7.58 14.37L5.92 21L12 17.5L18.08 21L16.42 14.37L22 9.5L14.84 8.34L12 2Z" />
+    </svg>
+);
