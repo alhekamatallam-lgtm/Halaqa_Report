@@ -46,7 +46,6 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students }) => {
         avgConsolidationIndex = 1;
       }
 
-      // FIX: Calculate and add missing 'avgGeneralIndex' property to conform to CircleReportData type.
       const avgGeneralIndex = (avgMemorizationIndex + avgReviewIndex + avgConsolidationIndex) / 3;
 
       report.push({
@@ -67,8 +66,8 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students }) => {
     return report;
   }, [students]);
 
-  const timeOptions = useMemo(() => Array.from(new Set(students.map(s => s.circleTime).filter(Boolean))), [students]);
-  const teacherOptions = useMemo(() => Array.from(new Set(students.map(s => s.teacherName).filter(Boolean))), [students]);
+  const timeOptions = useMemo(() => Array.from(new Set<string>(students.map(s => s.circleTime).filter(Boolean))), [students]);
+  const teacherOptions = useMemo(() => Array.from(new Set<string>(students.map(s => s.teacherName).filter(Boolean))), [students]);
 
   const filteredData = useMemo(() => {
     return aggregatedData.filter(circle => {

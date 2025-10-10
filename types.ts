@@ -114,3 +114,34 @@ export interface SupervisorData {
   password: string;
   circles: string[];
 }
+
+export interface RawTeacherAttendanceData {
+  "time": string;
+  "name": string;
+  "status": 'حضور' | 'انصراف';
+}
+
+export interface TeacherInfo {
+  name: string;
+  circle: string;
+}
+
+export interface TeacherDailyAttendance {
+  teacherName: string;
+  checkIn: Date | null;
+  checkOut: Date | null;
+  status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور';
+}
+
+export interface TeacherAttendanceReportEntry {
+  teacherName: string;
+  date: string;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+}
+
+export interface TeacherAttendanceSummaryEntry {
+  teacherName: string;
+  presentDays: number;
+  absentDays: number;
+}

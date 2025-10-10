@@ -14,31 +14,31 @@ const PodiumCard: React.FC<{ rank: number; circle: ExcellenceReportData | undefi
         1: {
             order: 'order-1 md:order-2',
             height: 'h-64',
-            bg: 'bg-amber-400',
-            textColor: 'text-amber-800',
-            borderColor: 'border-amber-500',
-            shadow: 'shadow-2xl',
-            iconColor: 'text-amber-600',
-            scale: 'scale-105'
+            bg: 'bg-gradient-to-b from-amber-300 to-amber-500',
+            textColor: 'text-amber-900',
+            borderColor: 'border-amber-600',
+            shadow: 'shadow-2xl shadow-amber-500/30',
+            iconColor: 'text-amber-800',
+            scale: 'scale-105 z-10'
         },
         2: {
             order: 'order-2 md:order-1',
             height: 'h-56',
-            bg: 'bg-stone-300',
-            textColor: 'text-stone-700',
-            borderColor: 'border-stone-400',
-            shadow: 'shadow-xl',
-            iconColor: 'text-stone-500',
+            bg: 'bg-gradient-to-b from-stone-200 to-stone-400',
+            textColor: 'text-stone-800',
+            borderColor: 'border-stone-500',
+            shadow: 'shadow-xl shadow-stone-500/20',
+            iconColor: 'text-stone-600',
             scale: ''
         },
         3: {
             order: 'order-3',
             height: 'h-56',
-            bg: 'bg-orange-300',
-            textColor: 'text-orange-800',
-            borderColor: 'border-orange-400',
-            shadow: 'shadow-xl',
-            iconColor: 'text-orange-600',
+            bg: 'bg-gradient-to-b from-orange-300 to-orange-500',
+            textColor: 'text-orange-900',
+            borderColor: 'border-orange-600',
+            shadow: 'shadow-xl shadow-orange-500/20',
+            iconColor: 'text-orange-700',
             scale: ''
         },
     };
@@ -47,16 +47,16 @@ const PodiumCard: React.FC<{ rank: number; circle: ExcellenceReportData | undefi
 
     return (
         <div className={`w-full md:w-1/3 p-2 ${styles.order}`}>
-            <div className={`relative flex flex-col items-center justify-center p-6 ${styles.height} ${styles.bg} rounded-t-xl border-4 ${styles.borderColor} ${styles.shadow} transform transition-transform duration-300 ${styles.scale}`}>
-                {rank === 1 && <CrownIcon className={`absolute -top-6 h-12 w-12 ${styles.iconColor}`} />}
-                <div className={`absolute top-3 right-3 flex items-center justify-center w-10 h-10 rounded-full bg-white/50 text-2xl font-bold ${styles.textColor}`}>
+            <div className={`relative flex flex-col items-center justify-center p-6 ${styles.height} ${styles.bg} rounded-t-xl border-b-8 ${styles.borderColor} ${styles.shadow} transform transition-all duration-300 ${styles.scale}`}>
+                {rank === 1 && <CrownIcon className={`absolute -top-7 h-14 w-14 drop-shadow-lg ${styles.iconColor}`} />}
+                <div className={`absolute top-3 right-3 flex items-center justify-center w-12 h-12 rounded-full bg-white/60 text-3xl font-bold ${styles.textColor} ring-2 ring-white/50`}>
                     {rank}
                 </div>
-                <h3 className="text-2xl font-bold text-center">{circle.circleName}</h3>
-                <p className={`text-sm font-semibold ${styles.textColor} mt-1`}>{circle.teacherName}</p>
+                <h3 className="text-2xl font-extrabold text-white text-center drop-shadow-md">{circle.circleName}</h3>
+                <p className={`font-semibold ${styles.textColor} mt-1 drop-shadow-sm`}>{circle.teacherName}</p>
                 <div className="mt-4 text-center">
-                    <p className="text-sm">مؤشر التميز</p>
-                    <p className="text-4xl font-extrabold">{(circle.excellenceScore * 100).toFixed(1)}%</p>
+                    <p className={`text-sm font-medium ${styles.textColor}`}>مؤشر التميز</p>
+                    <p className="text-5xl font-extrabold text-white drop-shadow-lg">{(circle.excellenceScore * 100).toFixed(1)}%</p>
                 </div>
             </div>
         </div>

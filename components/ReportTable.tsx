@@ -25,7 +25,7 @@ const SortableHeader: React.FC<{
   return (
     <th
       scope="col"
-      className={`px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider cursor-pointer ${className}`}
+      className={`px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider cursor-pointer ${className}`}
       onClick={() => onSort(sortKey)}
     >
       <div className="flex items-center justify-center gap-1">
@@ -38,33 +38,36 @@ const SortableHeader: React.FC<{
 
 export const ReportTable: React.FC<ReportTableProps> = ({ students, onRowClick, sortConfig, onSort }) => {
   return (
-    <div className="overflow-x-auto shadow-lg rounded-xl border border-stone-200">
+    <div className="overflow-x-auto shadow-xl rounded-xl border border-stone-200 bg-white">
       <table className="min-w-full divide-y divide-stone-200">
-        <thead className="bg-stone-200">
+        <thead className="bg-stone-200 sticky top-0 z-10">
           <tr>
-            <th scope="col" className="w-1/6 px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">
+            <th scope="col" className="w-1/6 px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
               اسم الطالب
             </th>
             <SortableHeader label="الحلقة" sortKey="circle" sortConfig={sortConfig} onSort={onSort} className="hidden md:table-cell" />
             <SortableHeader label="المعلم" sortKey="teacherName" sortConfig={sortConfig} onSort={onSort} className="hidden md:table-cell" />
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
               إنجاز الحفظ
             </th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
               إنجاز المراجعة
             </th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
               إنجاز التثبيت
             </th>
             <SortableHeader label="الحضور" sortKey="attendance" sortConfig={sortConfig} onSort={onSort} />
             <SortableHeader label="النقاط" sortKey="totalPoints" sortConfig={sortConfig} onSort={onSort} className="hidden md:table-cell" />
           </tr>
         </thead>
-        <tbody className="bg-stone-50 divide-y divide-stone-200">
-          {students.map((student) => (
+        <tbody className="bg-white divide-y divide-stone-200">
+          {students.map((student, index) => (
             <tr 
               key={student.username} 
-              className={`transition-colors duration-200 cursor-pointer ${student.hasMultipleEntries ? 'bg-amber-100/40 hover:bg-amber-100/70 ring-1 ring-amber-300' : 'hover:bg-amber-100/50'}`} 
+              className={`transition-all duration-200 cursor-pointer 
+                ${student.hasMultipleEntries 
+                  ? 'bg-amber-100/50 hover:bg-amber-100 ring-1 ring-amber-300' 
+                  : (index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70') + ' hover:bg-amber-100/60'}`} 
               onClick={() => onRowClick(student)}
             >
               <td className="px-6 py-4 text-sm font-medium text-stone-900 text-center">{student.studentName}</td>

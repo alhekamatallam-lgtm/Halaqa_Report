@@ -30,8 +30,9 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         const filteredStudents = selectedCircleTime
             ? studentsWithNotes.filter(s => s.circleTime === selectedCircleTime)
             : studentsWithNotes;
-        const teachers = new Set(filteredStudents.map(s => s.teacherName).filter(Boolean));
-        return Array.from(teachers).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+        // FIX: Explicitly type the Set to string to help with type inference.
+        const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
+        return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [studentsWithNotes, selectedCircleTime]);
 
     const circleOptions = useMemo(() => {
@@ -42,8 +43,9 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         if (selectedCircleTime) {
             filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
         }
-        const circles = new Set(filteredStudents.map(s => s.circle).filter(Boolean));
-        return Array.from(circles).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+        // FIX: Explicitly type the Set to string to help with type inference.
+        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+        return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [studentsWithNotes, selectedTeacher, selectedCircleTime]);
 
     const timeOptions = useMemo(() => {
@@ -54,8 +56,9 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         if (selectedCircle) {
             filteredStudents = filteredStudents.filter(s => s.circle === selectedCircle);
         }
-        const times = new Set(filteredStudents.map(s => s.circleTime).filter(Boolean));
-        return Array.from(times).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+        // FIX: Explicitly type the Set to string to help with type inference.
+        const times = new Set<string>(filteredStudents.map(s => s.circleTime).filter(item => item));
+        return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [studentsWithNotes, selectedTeacher, selectedCircle]);
 
     // Effects to reset selections if they become invalid

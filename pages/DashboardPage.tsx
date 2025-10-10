@@ -24,14 +24,14 @@ const StatItem: React.FC<{ label: string; value?: string | number; indexValue: n
 
 const CircleCard: React.FC<CircleCardProps> = ({ circle, onSelect }) => (
     <div 
-        className="bg-stone-50 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer flex flex-col border border-stone-200"
+        className="bg-white rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer flex flex-col border border-stone-200"
         onClick={() => onSelect(circle.circleName)}
     >
-        <div className="p-5 bg-stone-100 border-b border-stone-200">
+        <div className="p-5 border-b-2 border-amber-400">
             <h3 className="text-lg font-bold text-stone-800 truncate">{circle.circleName}</h3>
             <p className="text-sm text-stone-600">{circle.studentCount} طالب</p>
         </div>
-        <div className="p-5 divide-y divide-stone-200 flex-grow">
+        <div className="p-5 divide-y divide-stone-200 flex-grow bg-stone-50/50">
             <StatItem label="مجموع أوجه الحفظ" value={circle.totalMemorizationAchieved.toFixed(1)} indexValue={circle.avgMemorizationIndex} indexLabel="مؤشر الحفظ" />
             <StatItem label="مجموع أوجه المراجعة" value={circle.totalReviewAchieved.toFixed(1)} indexValue={circle.avgReviewIndex} indexLabel="مؤشر المراجعة" />
             <StatItem label="مجموع أوجه التثبيت" value={circle.totalConsolidationAchieved.toFixed(1)} indexValue={circle.avgConsolidationIndex} indexLabel="مؤشر التثبيت" />
@@ -119,9 +119,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
     const filteredStudents = selectedCircleTime
         ? students.filter(s => s.circleTime === selectedCircleTime)
         : students;
-    const teachers = new Set(filteredStudents.map(s => s.teacherName).filter(Boolean));
-    // FIX: Explicitly type sort callback parameters to resolve 'unknown' type error.
-    return Array.from(teachers).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+    // FIX: Explicitly type the Set to string to help with type inference.
+    const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
+    return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [students, selectedCircleTime]);
 
   const circleOptions = useMemo(() => {
@@ -132,9 +132,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       if (selectedCircleTime) {
           filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
       }
-      const circles = new Set(filteredStudents.map(s => s.circle).filter(Boolean));
-      // FIX: Explicitly type sort callback parameters to resolve 'unknown' type error.
-      return Array.from(circles).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+      // FIX: Explicitly type the Set to string to help with type inference.
+      const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+      return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [students, selectedTeacher, selectedCircleTime]);
 
   const timeOptions = useMemo(() => {
@@ -145,9 +145,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       if (selectedCircle) {
           filteredStudents = filteredStudents.filter(s => s.circle === selectedCircle);
       }
-      const times = new Set(filteredStudents.map(s => s.circleTime).filter(Boolean));
-      // FIX: Explicitly type sort callback parameters to resolve 'unknown' type error.
-      return Array.from(times).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+      // FIX: Explicitly type the Set to string to help with type inference.
+      const times = new Set<string>(filteredStudents.map(s => s.circleTime).filter(item => item));
+      return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [students, selectedTeacher, selectedCircle]);
 
   // Effects to reset selections if they become invalid
@@ -236,7 +236,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
         {filteredData.map(circle => (
           <CircleCard key={circle.circleName} circle={circle} onSelect={onCircleSelect} />
         ))}

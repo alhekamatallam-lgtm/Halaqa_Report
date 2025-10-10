@@ -34,22 +34,23 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
   }, [isOpen]);
 
   const teachers = useMemo(() => {
-    const teacherSet = new Set(students.map(s => s.teacherName).filter(Boolean));
-    // FIX: Explicitly typing the sort callback parameters as string to fix 'unknown' type error.
-    return Array.from(teacherSet).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+    // FIX: Explicitly type the Set to string to help with type inference.
+    const teacherSet = new Set<string>(students.map(s => s.teacherName).filter(item => item));
+    return Array.from(teacherSet).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [students]);
 
   const availableCircles = useMemo(() => {
     if (!selectedTeacher) return [];
     
-    const circleSet = new Set(
+    // FIX: Explicitly type the Set to string to help with type inference.
+    const circleSet = new Set<string>(
         students
-            .filter(s => s.teacherName === selectedTeacher && s.circle)
+            .filter(s => s.teacherName === selectedTeacher)
             .map(s => s.circle)
+            .filter(item => item)
     );
     
-    // FIX: Explicitly typing the sort callback parameters as string to fix 'unknown' type error.
-    return Array.from(circleSet).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+    return Array.from(circleSet).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [students, selectedTeacher]);
 
   useEffect(() => {

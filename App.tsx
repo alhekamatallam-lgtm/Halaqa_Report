@@ -6,12 +6,15 @@ import DashboardPage from './pages/DashboardPage';
 import NotesPage from './pages/NotesPage';
 import EvaluationPage from './pages/EvaluationPage';
 import ExcellencePage from './pages/ExcellencePage';
+import TeacherAttendancePage from './pages/TeacherAttendancePage';
+import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
 import PasswordModal from './components/PasswordModal';
 import { Nav } from './components/Nav';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData } from './types';
+import { Spinner } from './components/Spinner';
+import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo } from './types';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbwXlKv2wzbSStv602UBsQ3P1p7kTX-3nJ-bmAfbfjiKFrojtL6cfnzb-EmcNasIvw2s/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbx9ppbeol6DtF0g5zNRBj2uD5GmPwebFOBXDonw7eO-TIRoCM6rOMiLwIktQfiNPl11/exec';
 
 const parseAchievement = (value: any): Achievement => {
   const strValue = String(value || '');
@@ -86,6 +89,164 @@ const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
         supervisorName,
         ...data
     }));
+};
+
+const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeacherNames: string[]): TeacherDailyAttendance[] => {
+    const timeZone = 'Asia/Riyadh';
+    const todayRiyadh = new Date(new Date().toLocaleString('en-US', { timeZone }));
+    todayRiyadh.setHours(0, 0, 0, 0);
+
+    const teacherRecords = new Map<string, { checkIn: Date | null, checkOut: Date | null }>();
+
+    allTeacherNames.forEach(name => {
+        teacherRecords.set(name, { checkIn: null, checkOut: null });
+    });
+
+    data.forEach(item => {
+        const timestamp = new Date(item['time']);
+        const itemDateRiyadh = new Date(timestamp.toLocaleString('en-US', { timeZone }));
+        itemDateRiyadh.setHours(0, 0, 0, 0);
+        
+        const teacherName = (item['name'] || '').trim();
+        const status = (item.status || '').trim();
+
+        if (itemDateRiyadh.getTime() === todayRiyadh.getTime() && teacherRecords.has(teacherName)) {
+            const record = teacherRecords.get(teacherName)!;
+
+            if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
+                if (!record.checkIn || timestamp < record.checkIn) {
+                    record.checkIn = timestamp;
+                }
+            } else if (status === 'انصراف') {
+                if (!record.checkOut || timestamp > record.checkOut) {
+                    record.checkOut = timestamp;
+                }
+            }
+        }
+    });
+
+    return Array.from(teacherRecords.entries()).map(([teacherName, times]) => {
+        let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
+        if (times.checkIn && times.checkOut) {
+            status = 'مكتمل الحضور';
+        } else if (times.checkIn) {
+            status = 'حاضر';
+        }
+        
+        return {
+            teacherName,
+            checkIn: times.checkIn,
+            checkOut: times.checkOut,
+            status,
+        };
+    });
+};
+
+const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], allTeachers: string[]): TeacherAttendanceReportEntry[] => {
+    const timeZone = 'Asia/Riyadh';
+    
+    const toRiyadhDateString = (date: Date): string => {
+        const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(date);
+        const year = parts.find(p => p.type === 'year')?.value;
+        const month = parts.find(p => p.type === 'month')?.value;
+        const day = parts.find(p => p.type === 'day')?.value;
+        return `${year}-${month}-${day}`;
+    };
+
+    const timeFormatOptions: Intl.DateTimeFormatOptions = {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone,
+    };
+    
+    // Step 1: Aggregate check-in/check-out times per teacher per day
+    const dailyRecords = new Map<string, { teacherName: string; date: string; checkIn: Date | null; checkOut: Date | null }>();
+
+    data.forEach(item => {
+        const timestamp = new Date(item.time);
+        if (isNaN(timestamp.getTime())) return;
+        
+        const teacherName = (item.name || '').trim();
+        const status = (item.status || '').trim();
+        if (!teacherName) return;
+
+        const dateString = toRiyadhDateString(timestamp);
+        const mapKey = `${dateString}/${teacherName}`;
+
+        let entry = dailyRecords.get(mapKey);
+        if (!entry) {
+            entry = { teacherName, date: dateString, checkIn: null, checkOut: null };
+            dailyRecords.set(mapKey, entry);
+        }
+        
+        if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
+            if (!entry.checkIn || timestamp < entry.checkIn) {
+                entry.checkIn = timestamp;
+            }
+        } else if (status === 'انصراف') {
+            if (!entry.checkOut || timestamp > entry.checkOut) {
+                entry.checkOut = timestamp;
+            }
+        }
+    });
+
+    // Step 2: Determine date range and add records for absent days
+    if (data.length > 0 || allTeachers.length > 0) {
+        let minDate: Date | null = null;
+        let maxDate: Date | null = null;
+
+        data.forEach(item => {
+            const timestamp = new Date(item.time);
+            if (isNaN(timestamp.getTime())) return;
+            if (!minDate || timestamp < minDate) minDate = timestamp;
+            if (!maxDate || timestamp > maxDate) maxDate = timestamp;
+        });
+
+        const today = new Date();
+        if (!maxDate || today > maxDate) {
+            maxDate = today;
+        }
+        if (minDate && maxDate) {
+            const workingDays = [0, 1, 2, 3]; // Sunday to Wednesday
+            let currentDate = new Date(minDate);
+            currentDate.setHours(0, 0, 0, 0);
+
+            while (currentDate <= maxDate) {
+                if (workingDays.includes(currentDate.getDay())) {
+                    const dateString = toRiyadhDateString(currentDate);
+                    allTeachers.forEach(teacherName => {
+                        const mapKey = `${dateString}/${teacherName}`;
+                        if (!dailyRecords.has(mapKey)) {
+                            dailyRecords.set(mapKey, {
+                                teacherName,
+                                date: dateString,
+                                checkIn: null,
+                                checkOut: null,
+                            });
+                        }
+                    });
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        }
+    }
+
+    // Step 3: Format the aggregated data into the final report structure
+    const report: TeacherAttendanceReportEntry[] = Array.from(dailyRecords.values()).map(record => ({
+        teacherName: record.teacherName,
+        date: record.date,
+        checkInTime: record.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkIn) : null,
+        checkOutTime: record.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkOut) : null,
+    }));
+
+    // Step 4: Sort the final report
+    return report.sort((a, b) => {
+        if (a.date > b.date) return -1;
+        if (a.date < b.date) return 1;
+        return a.teacherName.localeCompare(b.teacherName, 'ar');
+    });
 };
 
 
@@ -164,21 +325,39 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
     return Array.from(studentsMap.values());
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
     const [evaluationData, setEvaluationData] = useState<CircleEvaluationData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
+    const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
+    const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submittingTeacher, setSubmittingTeacher] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState<Page>('general');
     const [initialStudentFilter, setInitialStudentFilter] = useState<{ circle: string } | null>(null);
     const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const asrTeachersInfo = useMemo(() => {
+        const teacherInfoMap = new Map<string, TeacherInfo>();
+        students
+            .filter(s => s.circleTime === 'العصر' && s.teacherName && s.circle)
+            .forEach(s => {
+                if (!teacherInfoMap.has(s.teacherName)) {
+                    teacherInfoMap.set(s.teacherName, { name: s.teacherName, circle: s.circle });
+                }
+            });
+        return Array.from(teacherInfoMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    }, [students]);
+
+    const asrTeacherNames = useMemo(() => asrTeachersInfo.map(t => t.name), [asrTeachersInfo]);
+
 
     useEffect(() => {
         if (notification) {
@@ -195,13 +374,14 @@ const App: React.FC = () => {
             setError(null);
             const cacheBuster = `&v=${new Date().getTime()}`;
             try {
+                // Fetch student and evaluation data
                 const allDataResponse = await fetch(`${API_URL}?${cacheBuster.substring(1)}`);
                 if (!allDataResponse.ok) throw new Error(`خطأ في الشبكة: ${allDataResponse.statusText}`);
                 const allDataJson = await allDataResponse.json();
                 
                 const dataContainer = allDataJson.data || allDataJson;
                 
-                const studentSheetName = Object.keys(dataContainer).find(name => name !== 'Evaluation_Sheet' && name !== 'supervisor');
+                const studentSheetName = Object.keys(dataContainer).find(name => name !== 'Evaluation_Sheet' && name !== 'supervisor' && name !== 'attandance');
                 let allStudentsRaw: any[] = [];
                 if (studentSheetName && Array.isArray(dataContainer[studentSheetName])) {
                     allStudentsRaw = dataContainer[studentSheetName];
@@ -222,6 +402,22 @@ const App: React.FC = () => {
                 if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
                     const processedSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
                     setSupervisors(processedSupervisors);
+                }
+
+                const attendanceRaw = dataContainer['attandance'] || [];
+                if (attendanceRaw && Array.isArray(attendanceRaw)) {
+                    const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
+                    const currentAsrTeacherNames = Array.from<string>(new Set(
+                        processedStudents
+                            .filter(s => s.circleTime === 'العصر')
+                            .map(s => s.teacherName)
+                            .filter(Boolean)
+                    ));
+                    const processedAttendance = processTeacherAttendanceData(rawAttendanceData, currentAsrTeacherNames);
+                    setTeacherAttendance(processedAttendance);
+
+                    const processedReport = processTeacherAttendanceReportData(rawAttendanceData, currentAsrTeacherNames);
+                    setTeacherAttendanceReport(processedReport);
                 }
 
             } catch (err) {
@@ -284,15 +480,76 @@ const App: React.FC = () => {
             setIsSubmitting(false);
         }
     };
+    
+    const handlePostTeacherAttendance = async (teacherName: string, action: 'حضور' | 'انصراف') => {
+        setIsSubmitting(true);
+        setSubmittingTeacher(teacherName);
+        setNotification(null);
+        const payload = {
+            sheet: 'attandance',
+            "name": teacherName,
+            "status": action,
+            "time": new Date().toISOString(),
+        };
+
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload),
+            });
+        } catch (err) {
+            if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+                console.log('Fetch error (attendance), likely due to Apps Script redirect. Proceeding.');
+            } else {
+                console.error("فشل في تسجيل الحضور:", err);
+                setNotification({ message: 'فشل في تسجيل الحضور. الرجاء التحقق من اتصالك.', type: 'error' });
+                setIsSubmitting(false);
+                setSubmittingTeacher(null);
+                return;
+            }
+        }
+
+        try {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const cacheBuster = `&v=${new Date().getTime()}`;
+            const attendanceResponse = await fetch(`${API_URL}?sheetName=attandance${cacheBuster}`);
+            if (!attendanceResponse.ok) throw new Error(`خطأ في تحديث الحضور: ${attendanceResponse.statusText}`);
+            const attendanceJson = await attendanceResponse.json();
+            
+            const dataContainer = attendanceJson.data || attendanceJson;
+            const attendanceRaw = dataContainer['attandance'] || (Array.isArray(dataContainer) ? dataContainer : []);
+            
+            if (!Array.isArray(attendanceRaw)) {
+                 throw new Error('تنسيق بيانات الحضور المحدثة غير صالح.');
+            }
+            
+            const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
+            const processedAttendance = processTeacherAttendanceData(rawAttendanceData, asrTeacherNames);
+            setTeacherAttendance(processedAttendance);
+
+            const processedReport = processTeacherAttendanceReportData(rawAttendanceData, asrTeacherNames);
+            setTeacherAttendanceReport(processedReport);
+
+            setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
+        } catch(refreshError) {
+            console.error("فشل تحديث بيانات الحضور:", refreshError);
+            setNotification({ message: 'تم التسجيل، ولكن فشل تحديث البيانات. حاول تحديث الصفحة.', type: 'error' });
+        } finally {
+            setIsSubmitting(false);
+            setSubmittingTeacher(null);
+        }
+    };
 
     const handleNavigation = (page: Page) => {
         setInitialStudentFilter(null);
         if (page === 'evaluation' && !authenticatedUser) {
+            setCurrentPage(page);
             setShowPasswordModal(true);
-            return;
+        } else {
+            setCurrentPage(page);
+            setShowPasswordModal(false);
         }
-        setShowPasswordModal(false);
-        setCurrentPage(page);
     };
 
     const handleCircleSelect = (circleName: string) => {
@@ -301,7 +558,11 @@ const App: React.FC = () => {
     };
     
     if (isLoading) {
-        return <div className="flex justify-center items-center h-screen text-lg text-gray-600"><p>جاري تحميل البيانات...</p></div>;
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <Spinner />
+            </div>
+        );
     }
     
     if (error) {
@@ -315,7 +576,9 @@ const App: React.FC = () => {
         dashboard: 'لوحة متابعة الحلقات',
         notes: 'ملاحظات الطلاب',
         evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
-        excellence: 'منصة تميز الحلقات'
+        excellence: 'منصة تميز الحلقات',
+        teacherAttendance: 'حضور وانصراف المعلمين',
+        teacherAttendanceReport: 'تقرير حضور المعلمين',
     };
 
     const renderPage = () => {
@@ -343,6 +606,18 @@ const App: React.FC = () => {
                         authenticatedUser={authenticatedUser}
                     />
                 );
+            case 'teacherAttendance':
+                return (
+                    <TeacherAttendancePage 
+                        allTeachers={asrTeachersInfo}
+                        attendanceStatus={teacherAttendance}
+                        onSubmit={handlePostTeacherAttendance}
+                        isSubmitting={isSubmitting}
+                        submittingTeacher={submittingTeacher}
+                    />
+                );
+            case 'teacherAttendanceReport':
+                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
             default:
                 return <StudentReportPage students={students} initialFilter={null} clearInitialFilter={() => {}} />;
         }
@@ -351,19 +626,21 @@ const App: React.FC = () => {
     return (
         <div className="bg-stone-100 min-h-screen font-sans">
             <Notification notification={notification} onClose={() => setNotification(null)} />
-            <header className="bg-stone-800 text-white shadow-lg pb-4">
+            <header className="bg-stone-800/95 backdrop-blur-sm text-white shadow-lg pb-4 sticky top-0 z-40 print-hidden">
                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center pt-6">
-                        <h2 className="text-2xl font-semibold text-stone-200">مجمع الراجحي بشبرا</h2>
+                        <h2 className="text-xl font-semibold text-stone-200">مجمع الراجحي بشبرا</h2>
                     </div>
-                    <h1 className="text-3xl font-bold leading-tight text-center text-amber-400 pt-2 pb-6" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.5)'}}>
+                    <h1 className="text-4xl font-bold leading-tight text-center text-amber-400 pt-2 pb-6" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.6)'}}>
                        {titles[currentPage]}
                     </h1>
                 </div>
                 <Nav currentPage={currentPage} onNavigate={handleNavigation} />
             </header>
-            <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                {renderPage()}
+            <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+                <div className="animate-slide-in">
+                  {renderPage()}
+                </div>
             </main>
             {showPasswordModal && (
                 <PasswordModal
@@ -371,7 +648,9 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
-                        setCurrentPage('evaluation');
+                        if (currentPage !== 'evaluation') {
+                            setCurrentPage('evaluation');
+                        }
                     }}
                     onClose={() => setShowPasswordModal(false)}
                 />

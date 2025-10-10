@@ -34,21 +34,20 @@ interface StatCardProps {
   value: string | number;
   description?: string;
   icon: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ label, value, description, icon, className = '', style }) => (
+const StatCard: React.FC<StatCardProps> = ({ label, value, description, icon }) => (
   <div
-    className={`bg-gradient-to-br from-stone-50 to-stone-100 p-6 rounded-2xl shadow-lg flex flex-col items-center text-center transform hover:scale-105 transition-transform duration-300 border border-stone-200 ${className}`}
-    style={style}
+    className="bg-white p-6 rounded-2xl shadow-xl flex items-center space-x-reverse space-x-6 transform hover:scale-105 transition-transform duration-300 border-t-4 border-amber-400"
   >
-    <div className="bg-amber-100 text-amber-600 rounded-full p-4 mb-4 shadow-inner">
+    <div className="flex-shrink-0 bg-amber-100 text-amber-600 rounded-full p-4">
       {icon}
     </div>
-    <p className="text-base font-semibold text-stone-600 truncate">{label}</p>
-    <p className="mt-1 text-4xl font-bold text-stone-800 tracking-tight">{value}</p>
-    {description && <p className="text-xs text-stone-500 mt-2 font-medium">{description}</p>}
+    <div>
+        <p className="text-2xl font-bold text-stone-800 tracking-tight">{value}</p>
+        <p className="text-base font-semibold text-stone-600 truncate">{label}</p>
+        {description && <p className="text-xs text-stone-500 mt-1 font-medium">{description}</p>}
+    </div>
   </div>
 );
 
@@ -78,7 +77,7 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
   }, [students]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
       <StatCard icon={<CircleIcon />} label="عدد الحلقات" value={stats.totalCircles} />
       <StatCard icon={<StudentIcon />} label="عدد الطلاب" value={stats.totalStudents} />
       <StatCard icon={<AttendanceIcon />} label="متوسط نسبة الحضور" value={`${(stats.avgAttendance * 100).toFixed(1)}%`} />
@@ -88,12 +87,16 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
       <StatCard icon={<BookIcon />} label="إجمالي أوجه التثبيت" value={stats.totalConsolidation.toFixed(1)} />
       
       <div className="sm:col-span-2 lg:col-span-3">
-         <StatCard 
-            icon={<StarIcon />}
-            label="إجمالي أوجه الإنجاز" 
-            value={stats.totalAchievement.toFixed(1)} 
-            description="مجموع أوجه الحفظ والمراجعة والتثبيت"
-        />
+         <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center space-x-reverse space-x-6 transform hover:scale-105 transition-transform duration-300 border-t-4 border-stone-800">
+             <div className="flex-shrink-0 bg-stone-800 text-amber-400 rounded-full p-4">
+                <StarIcon />
+             </div>
+             <div>
+                <p className="text-3xl font-bold text-stone-800 tracking-tight">{stats.totalAchievement.toFixed(1)}</p>
+                <p className="text-lg font-semibold text-stone-600 truncate">إجمالي أوجه الإنجاز</p>
+                <p className="text-sm text-stone-500 mt-1 font-medium">مجموع أوجه الحفظ والمراجعة والتثبيت</p>
+             </div>
+         </div>
       </div>
     </div>
   );

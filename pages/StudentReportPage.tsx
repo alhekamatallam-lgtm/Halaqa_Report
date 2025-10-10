@@ -3,6 +3,7 @@ import { ReportTable } from '../components/ReportTable';
 import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
 import type { ProcessedStudentData } from '../types';
+import { PrintIcon } from '../components/icons';
 
 type SortKey = keyof ProcessedStudentData;
 
@@ -40,9 +41,9 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         const filteredStudents = selectedCircleTime
             ? students.filter(s => s.circleTime === selectedCircleTime)
             : students;
-        const teachers = new Set(filteredStudents.map(s => s.teacherName).filter(Boolean));
-        // FIX: Explicitly typing the sort callback parameters as string to fix 'unknown' type error.
-        return Array.from(teachers).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+        // FIX: Explicitly type the Set to string to help with type inference.
+        const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
+        return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [students, selectedCircleTime]);
 
     const circleOptions = useMemo(() => {
@@ -53,9 +54,9 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         if (selectedCircleTime) {
             filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
         }
-        const circles = new Set(filteredStudents.map(s => s.circle).filter(Boolean));
-        // FIX: Explicitly typing the sort callback parameters as string to fix 'unknown' type error.
-        return Array.from(circles).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+        // FIX: Explicitly type the Set to string to help with type inference.
+        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+        return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [students, selectedTeacher, selectedCircleTime]);
 
     const timeOptions = useMemo(() => {
@@ -66,9 +67,9 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         if (selectedCircle) {
             filteredStudents = filteredStudents.filter(s => s.circle === selectedCircle);
         }
-        const times = new Set(filteredStudents.map(s => s.circleTime).filter(Boolean));
-        // FIX: Explicitly typing the sort callback parameters as string to fix 'unknown' type error.
-        return Array.from(times).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+        // FIX: Explicitly type the Set to string to help with type inference.
+        const times = new Set<string>(filteredStudents.map(s => s.circleTime).filter(item => item));
+        return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [students, selectedTeacher, selectedCircle]);
 
     // Effects to reset selections if they become invalid
@@ -117,6 +118,71 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         setSelectedCircleTime('');
         setSelectedTeacher('');
         setSelectedCircle('');
+    };
+
+    const handlePrint = () => {
+        const asrStudents = students.filter(s => s.circleTime === 'العصر');
+
+        const circles = asrStudents.reduce((acc, student) => {
+            if (!acc[student.circle]) {
+                acc[student.circle] = {
+                    teacherName: student.teacherName,
+                    students: []
+                };
+            }
+            acc[student.circle].students.push(student);
+            return acc;
+        }, {} as Record<string, { teacherName: string; students: ProcessedStudentData[] }>);
+
+        let printContent = '';
+
+        Object.keys(circles).sort((a, b) => a.localeCompare(b, 'ar')).forEach(circleName => {
+            const circleData = circles[circleName];
+            printContent += `
+                <div class="page-break">
+                    <div class="print-header">
+                        <h1>تقرير حلقة: ${circleName}</h1>
+                        <h2>المعلم: ${circleData.teacherName}</h2>
+                        <p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
+                    </div>
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>اسم الطالب</th>
+                                <th>أوجه الحفظ</th>
+                                <th>أوجه المراجعة</th>
+                                <th>أوجه التثبيت</th>
+                                <th>الحضور</th>
+                                <th>النقاط</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${circleData.students.map(student => `
+                                <tr>
+                                    <td>${student.studentName}</td>
+                                    <td>${student.memorizationPages.formatted}</td>
+                                    <td>${student.reviewPages.formatted}</td>
+                                    <td>${student.consolidationPages.formatted}</td>
+                                    <td>${(student.attendance * 100).toFixed(0)}%</td>
+                                    <td>${student.totalPoints}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        const printContainer = document.createElement('div');
+        printContainer.className = 'printable-student-report';
+        printContainer.innerHTML = printContent;
+        document.body.appendChild(printContainer);
+        
+        document.body.classList.add('student-print-active');
+        window.print();
+        document.body.classList.remove('student-print-active');
+
+        document.body.removeChild(printContainer);
     };
     
     const filteredAndSortedStudents = useMemo(() => {
@@ -177,6 +243,15 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
 
     return (
         <>
+            <div className="flex justify-end mb-4 print-hidden">
+                <button
+                onClick={handlePrint}
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"
+                >
+                <PrintIcon />
+                طباعة تقارير العصر
+                </button>
+            </div>
             <FilterControls
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}

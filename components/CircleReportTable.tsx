@@ -8,22 +8,22 @@ interface CircleReportTableProps {
 
 export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles }) => {
   return (
-    <div className="overflow-x-auto shadow-lg rounded-xl border border-stone-200">
+    <div className="overflow-x-auto shadow-xl rounded-xl border border-stone-200 bg-white">
       <table className="min-w-full divide-y divide-stone-200">
-        <thead className="bg-stone-200">
+        <thead className="bg-stone-200 sticky top-0 z-10">
           <tr>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">الحلقة</th>
-            <th scope="col" className="hidden md:table-cell px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">المعلم</th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">أوجه الحفظ / المؤشر</th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">أوجه المراجعة / المؤشر</th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">أوجه التثبيت / المؤشر</th>
-            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">نسبة الحضور</th>
-            <th scope="col" className="hidden md:table-cell px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">إجمالي النقاط</th>
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">الحلقة</th>
+            <th scope="col" className="hidden md:table-cell px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">المعلم</th>
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">أوجه الحفظ / المؤشر</th>
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">أوجه المراجعة / المؤشر</th>
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">أوجه التثبيت / المؤشر</th>
+            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">نسبة الحضور</th>
+            <th scope="col" className="hidden md:table-cell px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">إجمالي النقاط</th>
           </tr>
         </thead>
-        <tbody className="bg-stone-50 divide-y divide-stone-200">
-          {circles.map((circle) => (
-            <tr key={circle.circleName} className="hover:bg-amber-100/50 transition-colors">
+        <tbody className="bg-white divide-y divide-stone-200">
+          {circles.map((circle, index) => (
+            <tr key={circle.circleName} className={`transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70'} hover:bg-amber-100/60`}>
               <td className="px-6 py-4 text-sm font-medium text-stone-900 text-center">{circle.circleName}</td>
               <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{circle.teacherName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">

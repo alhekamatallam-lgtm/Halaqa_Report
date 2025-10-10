@@ -12,19 +12,144 @@
     <style>
       body {
         font-family: 'Cairo', sans-serif;
+        background-color: #f5f5f4; /* fallback */
+        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d6d3d1' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
       }
       @keyframes slide-in {
         from {
-          transform: translateX(100%);
+          transform: translateY(20px);
           opacity: 0;
         }
         to {
-          transform: translateX(0);
+          transform: translateY(0);
           opacity: 1;
         }
       }
       .animate-slide-in {
         animation: slide-in 0.5s ease-out forwards;
+      }
+      /* Global transitions for smoother UI */
+      .transition-all {
+        transition-property: all;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+      }
+      .transition-colors {
+        transition-property: background-color, border-color, color, fill, stroke, opacity;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 200ms;
+      }
+      
+      /* Print Styles */
+      @media print {
+        /* --- GENERAL PRINT SETUP --- */
+        body {
+          background-image: none !important;
+          background-color: white !important;
+          font-size: 10pt;
+        }
+        .print-hidden {
+          display: none !important;
+        }
+        tr {
+          page-break-inside: avoid;
+        }
+
+        /* --- SPECIAL STUDENT REPORT PRINT (triggered by body class) --- */
+        body.student-print-active > #root {
+          display: none !important;
+        }
+        .printable-student-report {
+          display: block !important;
+        }
+        .page-break {
+            page-break-after: always;
+            padding: 1rem;
+        }
+        .print-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .print-header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin: 0;
+        }
+        .print-header h2 {
+            font-size: 14pt;
+            font-weight: normal;
+            margin: 0.25rem 0;
+        }
+        .print-header p {
+            font-size: 10pt;
+            color: #555;
+            margin: 0;
+        }
+        .print-table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          font-size: 9pt;
+        }
+        .print-table thead {
+          background-color: #e2e8f0 !important;
+          -webkit-print-color-adjust: exact;
+          color-adjust: exact;
+        }
+        .print-table th, .print-table td {
+          border: 1px solid #9ca3af !important;
+          padding: 6px !important;
+          text-align: center;
+          color: black !important;
+        }
+        .print-table tbody tr:nth-child(even) {
+            background-color: #f8fafc !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+        }
+
+        /* --- DEFAULT REPORT PRINT (Teacher Attendance, etc.) --- */
+        body:not(.student-print-active) main,
+        body:not(.student-print-active) .printable-area {
+          padding: 0 !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        body:not(.student-print-active) table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          font-size: 9pt;
+        }
+        body:not(.student-print-active) thead {
+          background-color: #f2f2f2 !important;
+          -webkit-print-color-adjust: exact;
+          color-adjust: exact;
+        }
+        body:not(.student-print-active) th, 
+        body:not(.student-print-active) td {
+          border: 1px solid #ccc !important;
+          padding: 6px !important;
+          color: black !important;
+        }
+        
+        .absent-row-print {
+          background-color: #e5e5e5 !important;
+          -webkit-print-color-adjust: exact;
+          color-adjust: exact;
+        }
+        .print-title {
+          display: block !important;
+          text-align: center;
+          font-size: 16pt;
+          font-weight: bold;
+          margin-bottom: 20px;
+        }
+      }
+      .print-title {
+        display: none;
+      }
+      .printable-student-report {
+        display: none;
       }
     </style>
   <script type="importmap">
