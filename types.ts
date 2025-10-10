@@ -144,4 +144,5 @@ export interface TeacherAttendanceSummaryEntry {
   teacherName: string;
   presentDays: number;
   absentDays: number;
+  attendanceRate: number;
 }

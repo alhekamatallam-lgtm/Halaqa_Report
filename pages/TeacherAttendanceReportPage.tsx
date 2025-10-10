@@ -2,6 +2,7 @@ import React from 'react';
 import type { TeacherAttendanceReportEntry, TeacherAttendanceSummaryEntry } from '../types';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import { PrintIcon } from '../components/icons';
+import { ProgressBar } from '../components/ProgressBar';
 
 interface TeacherAttendanceReportPageProps {
   reportData: TeacherAttendanceReportEntry[];
@@ -51,11 +52,17 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
     });
 
     return Array.from(summaryMap.entries())
-        .map(([teacherName, data]) => ({
-            teacherName,
-            presentDays: data.presentDates.size,
-            absentDays: data.absentDates.size,
-        }))
+        .map(([teacherName, data]) => {
+            const presentDays = data.presentDates.size;
+            const absentDays = data.absentDates.size;
+            const totalDays = presentDays + absentDays;
+            return {
+                teacherName,
+                presentDays,
+                absentDays,
+                attendanceRate: totalDays > 0 ? presentDays / totalDays : 0,
+            };
+        })
         .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ar'));
   }, [filteredData]);
 
@@ -223,6 +230,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                   <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">اسم المعلم</th>
                   <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">عدد أيام الحضور</th>
                   <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">عدد أيام الغياب</th>
+                  <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">نسبة الحضور</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-stone-200">
@@ -248,11 +256,17 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                           {item.absentDays}
                         </button>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">
+                        <div className='w-24 mx-auto'>
+                            <ProgressBar value={item.attendanceRate} />
+                            <p className="text-xs text-center text-gray-600 mt-1">{(item.attendanceRate * 100).toFixed(0)}%</p>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={3} className="px-6 py-12 text-center text-stone-500">
+                    <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
                       لا توجد بيانات تطابق الفلتر المحدد.
                     </td>
                   </tr>
