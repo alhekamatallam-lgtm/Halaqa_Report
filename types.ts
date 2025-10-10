@@ -13,6 +13,8 @@ export interface RawStudentData {
   "نسبة الحضور": number;
   "اجمالي النقاط": number;
   "جوال ولي الأمر": string;
+  "الأسبوع"?: string;
+  "الاسبوع"?: string;
 }
 
 export interface Achievement {
@@ -37,7 +39,8 @@ export interface ProcessedStudentData {
   attendance: number;
   totalPoints: number;
   guardianMobile: string;
-  hasMultipleEntries: boolean;
+  week?: string;
+  hasMultipleEntries?: boolean;
 }
 
 export interface CircleReportData {

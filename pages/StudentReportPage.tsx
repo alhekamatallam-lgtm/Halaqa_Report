@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ReportTable } from '../components/ReportTable';
 import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
-import type { ProcessedStudentData } from '../types';
+import type { ProcessedStudentData, Achievement } from '../types';
 import { PrintIcon } from '../components/icons';
 
 type SortKey = keyof ProcessedStudentData;
@@ -22,6 +22,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
     const [selectedCircleTime, setSelectedCircleTime] = useState<string>('');
     const [selectedTeacher, setSelectedTeacher] = useState<string>('');
     const [selectedCircle, setSelectedCircle] = useState<string>('');
+    const [selectedWeek, setSelectedWeek] = useState<string>('');
 
     useEffect(() => {
         if (initialFilter?.circle) {
@@ -36,43 +37,47 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         }
     }, [initialFilter, clearInitialFilter, students]);
 
-    // Memoized, interconnected lists for filters
+    // Base student data, filtered by week first. This is the source for other filter options.
+    const studentsForFiltering = useMemo(() => {
+        if (!selectedWeek) {
+            return students;
+        }
+        return students.filter(s => s.week === selectedWeek);
+    }, [students, selectedWeek]);
+
+    // Memoized, interconnected lists for filters, following a strict hierarchy.
+    const timeOptions = useMemo(() => {
+        const times = new Set<string>(studentsForFiltering.map(s => s.circleTime).filter(item => item));
+        return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
+    }, [studentsForFiltering]);
+    
     const teacherOptions = useMemo(() => {
         const filteredStudents = selectedCircleTime
-            ? students.filter(s => s.circleTime === selectedCircleTime)
-            : students;
-        // FIX: Explicitly type the Set to string to help with type inference.
+            ? studentsForFiltering.filter(s => s.circleTime === selectedCircleTime)
+            : studentsForFiltering;
         const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
         return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [students, selectedCircleTime]);
+    }, [studentsForFiltering, selectedCircleTime]);
 
     const circleOptions = useMemo(() => {
-        let filteredStudents = students;
-        if (selectedTeacher) {
-            filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
-        }
+        let filteredStudents = studentsForFiltering;
         if (selectedCircleTime) {
             filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
         }
-        // FIX: Explicitly type the Set to string to help with type inference.
-        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
-        return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [students, selectedTeacher, selectedCircleTime]);
-
-    const timeOptions = useMemo(() => {
-        let filteredStudents = students;
         if (selectedTeacher) {
             filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
         }
-        if (selectedCircle) {
-            filteredStudents = filteredStudents.filter(s => s.circle === selectedCircle);
-        }
-        // FIX: Explicitly type the Set to string to help with type inference.
-        const times = new Set<string>(filteredStudents.map(s => s.circleTime).filter(item => item));
-        return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [students, selectedTeacher, selectedCircle]);
+        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+        return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
+    }, [studentsForFiltering, selectedCircleTime, selectedTeacher]);
+    
+    // Week options should always be from the full student list
+    const weekOptions = useMemo(() => {
+        const weeks = new Set<string>(students.map(s => s.week).filter((w): w is string => !!w));
+        return Array.from(weeks).sort((a, b) => a.localeCompare(b, 'ar'));
+    }, [students]);
 
-    // Effects to reset selections if they become invalid
+    // Effects to reset selections if they become invalid (safety net)
     useEffect(() => {
         if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
             setSelectedTeacher('');
@@ -91,25 +96,24 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         }
     }, [selectedCircleTime, timeOptions]);
 
-    const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle', value: string) => {
-        if (filterType === 'time') {
+    const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle' | 'week', value: string) => {
+        if (filterType === 'week') {
+            setSelectedWeek(value);
+            // Reset downstream filters
+            setSelectedCircleTime('');
+            setSelectedTeacher('');
+            setSelectedCircle('');
+        } else if (filterType === 'time') {
             setSelectedCircleTime(value);
-            if (!value) { // Resetting time
-                setSelectedTeacher('');
-                setSelectedCircle('');
-            }
+            // Reset downstream filters
+            setSelectedTeacher('');
+            setSelectedCircle('');
         } else if (filterType === 'teacher') {
             setSelectedTeacher(value);
-            setSelectedCircle(''); // Reset circle when teacher changes
+            // Reset downstream filter
+            setSelectedCircle('');
         } else if (filterType === 'circle') {
             setSelectedCircle(value);
-            if (value) {
-                const studentForCircle = students.find(s => s.circle === value);
-                if (studentForCircle) {
-                    if (!selectedTeacher) setSelectedTeacher(studentForCircle.teacherName);
-                    if (!selectedCircleTime) setSelectedCircleTime(studentForCircle.circleTime);
-                }
-            }
         }
     };
 
@@ -118,97 +122,116 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         setSelectedCircleTime('');
         setSelectedTeacher('');
         setSelectedCircle('');
+        setSelectedWeek('');
     };
 
-    const handlePrint = () => {
-        const asrStudents = students.filter(s => s.circleTime === 'العصر');
+    const { filteredAndSortedStudents, reportTitle, summary } = useMemo(() => {
+        // Step 1: Prepare the base data (either aggregated or for a specific week)
+        let dataToFilter: ProcessedStudentData[];
+        let title: string;
 
-        const circles = asrStudents.reduce((acc, student) => {
-            if (!acc[student.circle]) {
-                acc[student.circle] = {
-                    teacherName: student.teacherName,
-                    students: []
+        if (selectedWeek) {
+            dataToFilter = students
+                .filter(student => student.week === selectedWeek)
+                .map(s => ({ ...s, hasMultipleEntries: false }));
+            title = `عرض بيانات: ${selectedWeek}`;
+        } else {
+            const aggregationMap = new Map<number, {
+                latestRow: ProcessedStudentData;
+                memAchieved: number;
+                memRequired: number;
+                revAchieved: number;
+                revRequired: number;
+                conAchieved: number;
+                conRequired: number;
+                pointsSum: number;
+                attendanceSum: number;
+                entryCount: number;
+                memorizationLessons: string[];
+                reviewLessons: string[];
+            }>();
+
+            students.forEach(item => {
+                const { username, memorizationPages, reviewPages, consolidationPages, attendance, totalPoints, memorizationLessons, reviewLessons } = item;
+                if (!username) return;
+
+                if (aggregationMap.has(username)) {
+                    const agg = aggregationMap.get(username)!;
+                    agg.latestRow = item;
+                    agg.memAchieved += memorizationPages.achieved;
+                    agg.memRequired += memorizationPages.required;
+                    agg.revAchieved += reviewPages.achieved;
+                    agg.revRequired += reviewPages.required;
+                    agg.conAchieved += consolidationPages.achieved;
+                    agg.conRequired += consolidationPages.required;
+                    agg.pointsSum += totalPoints;
+                    agg.attendanceSum += attendance;
+                    agg.entryCount += 1;
+                    if (memorizationLessons) agg.memorizationLessons.push(memorizationLessons);
+                    if (reviewLessons) agg.reviewLessons.push(reviewLessons);
+                } else {
+                    aggregationMap.set(username, {
+                        latestRow: item,
+                        memAchieved: memorizationPages.achieved,
+                        memRequired: memorizationPages.required,
+                        revAchieved: reviewPages.achieved,
+                        revRequired: reviewPages.required,
+                        conAchieved: consolidationPages.achieved,
+                        conRequired: consolidationPages.required,
+                        pointsSum: totalPoints,
+                        attendanceSum: attendance,
+                        entryCount: 1,
+                        memorizationLessons: [memorizationLessons].filter(Boolean),
+                        reviewLessons: [reviewLessons].filter(Boolean),
+                    });
+                }
+            });
+
+            dataToFilter = Array.from(aggregationMap.values()).map(agg => {
+                const { latestRow, entryCount } = agg;
+                const createAchievement = (achieved: number, required: number): Achievement => ({
+                    achieved, required,
+                    formatted: `${achieved.toFixed(1)} / ${required.toFixed(1)}`,
+                    index: required > 0 ? achieved / required : 0,
+                });
+
+                return {
+                    ...latestRow,
+                    memorizationLessons: agg.memorizationLessons.join(', '),
+                    memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
+                    reviewLessons: agg.reviewLessons.join(', '),
+                    reviewPages: createAchievement(agg.revAchieved, agg.revRequired),
+                    consolidationPages: createAchievement(agg.conAchieved, agg.conRequired),
+                    attendance: entryCount > 0 ? agg.attendanceSum / entryCount : 0,
+                    totalPoints: agg.pointsSum,
+                    hasMultipleEntries: entryCount > 1,
                 };
-            }
-            acc[student.circle].students.push(student);
-            return acc;
-        }, {} as Record<string, { teacherName: string; students: ProcessedStudentData[] }>);
+            });
+            title = 'العرض المجمع لجميع الأسابيع';
+        }
 
-        let printContent = '';
+        // Step 2: Apply other filters to the prepared data
+        let filteredList = dataToFilter;
 
-        Object.keys(circles).sort((a, b) => a.localeCompare(b, 'ar')).forEach(circleName => {
-            const circleData = circles[circleName];
-            printContent += `
-                <div class="page-break">
-                    <div class="print-header">
-                        <h1>تقرير حلقة: ${circleName}</h1>
-                        <h2>المعلم: ${circleData.teacherName}</h2>
-                        <p>تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
-                    </div>
-                    <table class="print-table">
-                        <thead>
-                            <tr>
-                                <th>اسم الطالب</th>
-                                <th>مؤشر الحفظ</th>
-                                <th>مؤشر المراجعة</th>
-                                <th>مؤشر التثبيت</th>
-                                <th>الحضور</th>
-                                <th>النقاط</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${circleData.students.map(student => `
-                                <tr>
-                                    <td>${student.studentName}</td>
-                                    <td>${(student.memorizationPages.index * 100).toFixed(0)}%</td>
-                                    <td>${(student.reviewPages.index * 100).toFixed(0)}%</td>
-                                    <td>${(student.consolidationPages.index * 100).toFixed(0)}%</td>
-                                    <td>${(student.attendance * 100).toFixed(0)}%</td>
-                                    <td>${student.totalPoints}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        });
-
-        const printContainer = document.createElement('div');
-        printContainer.className = 'printable-student-report';
-        printContainer.innerHTML = printContent;
-        document.body.appendChild(printContainer);
-        
-        document.body.classList.add('student-print-active');
-        window.print();
-        document.body.classList.remove('student-print-active');
-
-        document.body.removeChild(printContainer);
-    };
-    
-    const filteredAndSortedStudents = useMemo(() => {
-        let studentsToProcess = students;
-        
         if (searchQuery) {
-            studentsToProcess = studentsToProcess.filter(student =>
+            filteredList = filteredList.filter(student =>
                 student.studentName.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
-
         if (selectedCircleTime) {
-            studentsToProcess = studentsToProcess.filter(student => student.circleTime === selectedCircleTime);
+            filteredList = filteredList.filter(student => student.circleTime === selectedCircleTime);
         }
         if (selectedTeacher) {
-            studentsToProcess = studentsToProcess.filter(student => student.teacherName === selectedTeacher);
+            filteredList = filteredList.filter(student => student.teacherName === selectedTeacher);
         }
         if (selectedCircle) {
-            studentsToProcess = studentsToProcess.filter(student => student.circle === selectedCircle);
+            filteredList = filteredList.filter(student => student.circle === selectedCircle);
         }
 
-
-        const sortableStudents = [...studentsToProcess];
-
+        // Step 3: Sort the final list
+        const sortedList = [...filteredList];
         if (sortConfig !== null) {
-            sortableStudents.sort((a, b) => {
+            sortedList.sort((a, b) => {
                 const aValue = a[sortConfig.key];
                 const bValue = b[sortConfig.key];
 
@@ -229,9 +252,108 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                 return sortConfig.direction === 'ascending' ? comparison : -comparison;
             });
         }
+        
+        // Step 4: Calculate summary
+        const summary = {
+            totalMemorizationAchieved: sortedList.reduce((acc, s) => acc + s.memorizationPages.achieved, 0),
+            totalMemorizationRequired: sortedList.reduce((acc, s) => acc + s.memorizationPages.required, 0),
+            totalReviewAchieved: sortedList.reduce((acc, s) => acc + s.reviewPages.achieved, 0),
+            totalReviewRequired: sortedList.reduce((acc, s) => acc + s.reviewPages.required, 0),
+            totalConsolidationAchieved: sortedList.reduce((acc, s) => acc + s.consolidationPages.achieved, 0),
+            totalConsolidationRequired: sortedList.reduce((acc, s) => acc + s.consolidationPages.required, 0),
+            avgAttendance: sortedList.length > 0 ? sortedList.reduce((acc, s) => acc + s.attendance, 0) / sortedList.length : 0,
+            totalPoints: sortedList.reduce((acc, s) => acc + s.totalPoints, 0),
+        };
 
-        return sortableStudents;
-    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery]);
+        return { filteredAndSortedStudents: sortedList, reportTitle: title, summary };
+    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek]);
+    
+    const handlePrint = () => {
+        const studentsToPrint = filteredAndSortedStudents.filter(s => s.circleTime === 'العصر');
+
+        const circles = studentsToPrint.reduce((acc, student) => {
+            if (!acc[student.circle]) {
+                acc[student.circle] = {
+                    teacherName: student.teacherName,
+                    students: []
+                };
+            }
+            acc[student.circle].students.push(student);
+            return acc;
+        }, {} as Record<string, { teacherName: string; students: ProcessedStudentData[] }>);
+
+        const getProgressBarHtml = (value: number) => {
+            const percentage = Math.min(Math.max(value * 100, 0), 100);
+            return `
+                <div class="print-progress-container">
+                    <div class="print-progress-bar" style="width: ${percentage.toFixed(0)}%;"></div>
+                </div>
+            `;
+        };
+
+        let printContent = '';
+
+        Object.keys(circles).sort((a, b) => a.localeCompare(b, 'ar')).forEach(circleName => {
+            const circleData = circles[circleName];
+            const weekText = selectedWeek ? `الأسبوع: ${selectedWeek}` : 'العرض المجمع لجميع الأسابيع';
+            printContent += `
+                <div class="page-break">
+                    <div class="print-header">
+                        <h1>تقرير حلقة: ${circleName}</h1>
+                        <h2>المعلم: ${circleData.teacherName}</h2>
+                        <p>${weekText}</p>
+                    </div>
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>اسم الطالب</th>
+                                <th>إنجاز الحفظ</th>
+                                <th>إنجاز المراجعة</th>
+                                <th>إنجاز التثبيت</th>
+                                <th>الحضور</th>
+                                <th>النقاط</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${circleData.students.map(student => `
+                                <tr>
+                                    <td>${student.studentName}</td>
+                                    <td>
+                                        <div class="print-achievement-text">${student.memorizationPages.formatted}</div>
+                                        ${getProgressBarHtml(student.memorizationPages.index)}
+                                    </td>
+                                    <td>
+                                        <div class="print-achievement-text">${student.reviewPages.formatted}</div>
+                                        ${getProgressBarHtml(student.reviewPages.index)}
+                                    </td>
+                                    <td>
+                                        <div class="print-achievement-text">${student.consolidationPages.formatted}</div>
+                                        ${getProgressBarHtml(student.consolidationPages.index)}
+                                    </td>
+                                    <td>
+                                        <div class="print-achievement-text">${(student.attendance * 100).toFixed(0)}%</div>
+                                        ${getProgressBarHtml(student.attendance)}
+                                    </td>
+                                    <td>${student.totalPoints}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        const printContainer = document.createElement('div');
+        printContainer.className = 'printable-student-report';
+        printContainer.innerHTML = printContent;
+        document.body.appendChild(printContainer);
+        
+        document.body.classList.add('student-print-active');
+        window.print();
+        document.body.classList.remove('student-print-active');
+
+        document.body.removeChild(printContainer);
+    };
 
     const handleSort = (key: SortKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
@@ -261,14 +383,20 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                 selectedTeacher={selectedTeacher}
                 availableCircles={circleOptions}
                 selectedCircle={selectedCircle}
+                allWeeks={weekOptions}
+                selectedWeek={selectedWeek}
                 onFilterChange={handleFilterChange}
                 onClearFilters={handleClearFilters}
             />
+             <div className="mb-4">
+                <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
+            </div>
             <ReportTable
                 students={filteredAndSortedStudents}
                 onRowClick={setSelectedStudent}
                 sortConfig={sortConfig}
                 onSort={handleSort}
+                summary={summary}
             />
             {selectedStudent && (
                 <StudentDetailModal

@@ -2,11 +2,39 @@ import React from 'react';
 import type { CircleReportData } from '../types';
 import { ProgressBar } from './ProgressBar';
 
-interface CircleReportTableProps {
-  circles: CircleReportData[];
+interface CircleReportSummary {
+  totalMemorizationAchieved: number;
+  totalMemorizationRequired: number;
+  totalReviewAchieved: number;
+  totalReviewRequired: number;
+  totalConsolidationAchieved: number;
+  totalConsolidationRequired: number;
+  avgAttendance: number;
+  totalPoints: number;
 }
 
-export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles }) => {
+interface CircleReportTableProps {
+  circles: CircleReportData[];
+  summary: CircleReportSummary;
+}
+
+const SummaryAchievementCell: React.FC<{ achieved: number; required: number; }> = ({ achieved, required }) => {
+    const index = required > 0 ? achieved / required : 0;
+    return (
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">
+            <div className='flex flex-col gap-1 items-center'>
+                <span className="font-semibold">{`${achieved.toFixed(1)} / ${required.toFixed(1)}`}</span>
+                <div className="w-full">
+                    <ProgressBar value={index} />
+                    <p className="text-xs text-center text-gray-700 mt-1 font-bold">{(index * 100).toFixed(0)}%</p>
+                </div>
+            </div>
+        </td>
+    );
+};
+
+
+export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles, summary }) => {
   return (
     <div className="overflow-x-auto shadow-xl rounded-xl border border-stone-200 bg-white">
       <table className="min-w-full divide-y divide-stone-200">
@@ -63,6 +91,22 @@ export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles })
             </tr>
           ))}
         </tbody>
+        <tfoot className="bg-stone-200 font-bold text-stone-800">
+            <tr>
+                <td className="px-6 py-4 text-center">الإجمالي</td>
+                <td className="hidden md:table-cell px-6 py-4"></td>
+                <SummaryAchievementCell achieved={summary.totalMemorizationAchieved} required={summary.totalMemorizationRequired} />
+                <SummaryAchievementCell achieved={summary.totalReviewAchieved} required={summary.totalReviewRequired} />
+                <SummaryAchievementCell achieved={summary.totalConsolidationAchieved} required={summary.totalConsolidationRequired} />
+                <td className="px-6 py-4 text-center">
+                  <div className='w-24 mx-auto'>
+                      <ProgressBar value={summary.avgAttendance} />
+                      <p className="text-xs text-center text-gray-700 mt-1 font-bold">{(summary.avgAttendance * 100).toFixed(0)}%</p>
+                  </div>
+                </td>
+                <td className="hidden md:table-cell px-6 py-4 text-center">{summary.totalPoints}</td>
+            </tr>
+        </tfoot>
       </table>
     </div>
   );

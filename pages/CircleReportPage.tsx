@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { ProcessedStudentData, CircleReportData } from '../types';
 import CircleFilterControls from '../components/CircleFilterControls';
 import { CircleReportTable } from '../components/CircleReportTable';
@@ -11,18 +11,75 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCircleTime, setSelectedCircleTime] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState('');
 
-  const aggregatedData = useMemo(() => {
+  const weekOptions = useMemo(() => {
+    const weeks = new Set<string>(students.map(s => s.week).filter((w): w is string => !!w));
+    return Array.from(weeks).sort((a,b) => a.localeCompare(b, 'ar'));
+  }, [students]);
+
+  const studentsForFiltering = useMemo(() => {
+    if (!selectedWeek) return students;
+    return students.filter(s => s.week === selectedWeek);
+  }, [students, selectedWeek]);
+
+  const timeOptions = useMemo(() => {
+    const times = new Set<string>(studentsForFiltering.map(s => s.circleTime).filter(Boolean));
+    return Array.from(times).sort((a,b) => a.localeCompare(b, 'ar'));
+  }, [studentsForFiltering]);
+  
+  const teacherOptions = useMemo(() => {
+    const filteredStudents = selectedCircleTime
+        ? studentsForFiltering.filter(s => s.circleTime === selectedCircleTime)
+        : studentsForFiltering;
+    const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(Boolean));
+    return Array.from(teachers).sort((a,b) => a.localeCompare(b, 'ar'));
+  }, [studentsForFiltering, selectedCircleTime]);
+
+  useEffect(() => {
+      if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
+          setSelectedTeacher('');
+      }
+  }, [selectedTeacher, teacherOptions]);
+
+  const handleFilterChange = (filterType: 'time' | 'teacher' | 'week', value: string) => {
+      if(filterType === 'week') {
+        setSelectedWeek(value);
+        setSelectedCircleTime('');
+        setSelectedTeacher('');
+      } else if(filterType === 'time') {
+        setSelectedCircleTime(value);
+        setSelectedTeacher('');
+      } else if(filterType === 'teacher') {
+        setSelectedTeacher(value);
+      }
+  }
+  
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedCircleTime('');
+    setSelectedTeacher('');
+    setSelectedWeek('');
+  };
+  
+  const { circles: filteredData, summary } = useMemo(() => {
+    let filteredStudents = studentsForFiltering;
+    if (selectedCircleTime) {
+      filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
+    }
+    if (selectedTeacher) {
+      filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
+    }
+
     const circlesMap = new Map<string, ProcessedStudentData[]>();
-
-    students.forEach(student => {
+    filteredStudents.forEach(student => {
       if (!circlesMap.has(student.circle)) {
         circlesMap.set(student.circle, []);
       }
       circlesMap.get(student.circle)!.push(student);
     });
 
-    const report: CircleReportData[] = [];
+    let report: CircleReportData[] = [];
     for (const [circleName, circleStudents] of circlesMap.entries()) {
       if (circleStudents.length === 0) continue;
 
@@ -63,35 +120,30 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students }) => {
         totalPoints,
       });
     }
-    return report;
-  }, [students]);
+    
+    if(searchQuery){
+        report = report.filter(circle => circle.circleName.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
 
-  const timeOptions = useMemo(() => Array.from(new Set<string>(students.map(s => s.circleTime).filter(Boolean))), [students]);
-  const teacherOptions = useMemo(() => Array.from(new Set<string>(students.map(s => s.teacherName).filter(Boolean))), [students]);
+    // Calculate Summary from the students that make up the final filtered report
+    const finalCircleNames = new Set(report.map(c => c.circleName));
+    const finalStudents = filteredStudents.filter(s => finalCircleNames.has(s.circle));
+    
+    const summary = {
+        totalMemorizationAchieved: finalStudents.reduce((acc, s) => acc + s.memorizationPages.achieved, 0),
+        totalMemorizationRequired: finalStudents.reduce((acc, s) => acc + s.memorizationPages.required, 0),
+        totalReviewAchieved: finalStudents.reduce((acc, s) => acc + s.reviewPages.achieved, 0),
+        totalReviewRequired: finalStudents.reduce((acc, s) => acc + s.reviewPages.required, 0),
+        totalConsolidationAchieved: finalStudents.reduce((acc, s) => acc + s.consolidationPages.achieved, 0),
+        totalConsolidationRequired: finalStudents.reduce((acc, s) => acc + s.consolidationPages.required, 0),
+        avgAttendance: finalStudents.length > 0 ? finalStudents.reduce((acc, s) => acc + s.attendance, 0) / finalStudents.length : 0,
+        totalPoints: finalStudents.reduce((acc, s) => acc + s.totalPoints, 0),
+    };
+    
+    return { circles: report, summary };
+  }, [studentsForFiltering, searchQuery, selectedCircleTime, selectedTeacher]);
 
-  const filteredData = useMemo(() => {
-    return aggregatedData.filter(circle => {
-      const studentSample = students.find(s => s.circle === circle.circleName);
-      if (!studentSample) return false;
-
-      const matchesSearch = circle.circleName.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTime = !selectedCircleTime || studentSample.circleTime === selectedCircleTime;
-      const matchesTeacher = !selectedTeacher || circle.teacherName === selectedTeacher;
-      
-      return matchesSearch && matchesTime && matchesTeacher;
-    });
-  }, [aggregatedData, searchQuery, selectedCircleTime, selectedTeacher, students]);
-  
-  const handleFilterChange = (filterType: 'time' | 'teacher', value: string) => {
-      if(filterType === 'time') setSelectedCircleTime(value);
-      if(filterType === 'teacher') setSelectedTeacher(value);
-  }
-  
-  const handleClearFilters = () => {
-    setSearchQuery('');
-    setSelectedCircleTime('');
-    setSelectedTeacher('');
-  };
+  const reportTitle = selectedWeek ? `عرض بيانات: ${selectedWeek}` : 'العرض المجمع لجميع الأسابيع';
 
   return (
     <>
@@ -102,10 +154,15 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students }) => {
         selectedCircleTime={selectedCircleTime}
         allTeachers={teacherOptions}
         selectedTeacher={selectedTeacher}
+        allWeeks={weekOptions}
+        selectedWeek={selectedWeek}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
       />
-      <CircleReportTable circles={filteredData} />
+      <div className="mb-4">
+        <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
+      </div>
+      <CircleReportTable circles={filteredData} summary={summary} />
     </>
   );
 };

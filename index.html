@@ -100,11 +100,33 @@
           padding: 6px !important;
           text-align: center;
           color: black !important;
+          vertical-align: middle;
         }
         .print-table tbody tr:nth-child(even) {
             background-color: #f8fafc !important;
             -webkit-print-color-adjust: exact;
             color-adjust: exact;
+        }
+        .print-progress-container {
+            width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+            background-color: #e5e7eb !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 4px;
+            height: 8px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .print-progress-bar {
+            height: 100%;
+            background-color: #3b82f6 !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+        }
+        .print-achievement-text {
+            font-size: 9pt;
+            font-weight: bold;
         }
 
         /* --- DEFAULT REPORT PRINT (Teacher Attendance, etc.) --- */

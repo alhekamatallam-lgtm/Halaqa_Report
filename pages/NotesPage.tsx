@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ReportTable } from '../components/ReportTable';
 import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
-import type { ProcessedStudentData } from '../types';
+import type { ProcessedStudentData, Achievement } from '../types';
 
 type SortKey = keyof ProcessedStudentData;
 
@@ -22,46 +22,120 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
 
     // Filter students to only those with notes/multiple entries
     const studentsWithNotes = useMemo(() => {
-        return students.filter(s => s.hasMultipleEntries);
+        const studentEntryCounts = new Map<number, number>();
+        students.forEach(s => {
+            studentEntryCounts.set(s.username, (studentEntryCounts.get(s.username) || 0) + 1);
+        });
+
+        const multiEntryUsernames = new Set<number>();
+        studentEntryCounts.forEach((count, username) => {
+            if (count > 1) {
+                multiEntryUsernames.add(username);
+            }
+        });
+
+        const studentsToAggregate = students.filter(s => multiEntryUsernames.has(s.username));
+
+        const aggregationMap = new Map<number, {
+            latestRow: ProcessedStudentData;
+            memAchieved: number;
+            memRequired: number;
+            revAchieved: number;
+            revRequired: number;
+            conAchieved: number;
+            conRequired: number;
+            pointsSum: number;
+            attendanceSum: number;
+            entryCount: number;
+            memorizationLessons: string[];
+            reviewLessons: string[];
+        }>();
+
+        studentsToAggregate.forEach(item => {
+            const { username, memorizationPages, reviewPages, consolidationPages, attendance, totalPoints, memorizationLessons, reviewLessons } = item;
+            if (!username) return;
+
+            if (aggregationMap.has(username)) {
+                const agg = aggregationMap.get(username)!;
+                agg.latestRow = item;
+                agg.memAchieved += memorizationPages.achieved;
+                agg.memRequired += memorizationPages.required;
+                agg.revAchieved += reviewPages.achieved;
+                agg.revRequired += reviewPages.required;
+                agg.conAchieved += consolidationPages.achieved;
+                agg.conRequired += consolidationPages.required;
+                agg.pointsSum += totalPoints;
+                agg.attendanceSum += attendance;
+                agg.entryCount += 1;
+                if (memorizationLessons) agg.memorizationLessons.push(memorizationLessons);
+                if (reviewLessons) agg.reviewLessons.push(reviewLessons);
+            } else {
+                aggregationMap.set(username, {
+                    latestRow: item,
+                    memAchieved: memorizationPages.achieved,
+                    memRequired: memorizationPages.required,
+                    revAchieved: reviewPages.achieved,
+                    revRequired: reviewPages.required,
+                    conAchieved: consolidationPages.achieved,
+                    conRequired: consolidationPages.required,
+                    pointsSum: totalPoints,
+                    attendanceSum: attendance,
+                    entryCount: 1,
+                    memorizationLessons: [memorizationLessons].filter(Boolean),
+                    reviewLessons: [reviewLessons].filter(Boolean),
+                });
+            }
+        });
+        
+        return Array.from(aggregationMap.values()).map(agg => {
+            const { latestRow, entryCount } = agg;
+            const createAchievement = (achieved: number, required: number): Achievement => ({
+                achieved, required,
+                formatted: `${achieved.toFixed(1)} / ${required.toFixed(1)}`,
+                index: required > 0 ? achieved / required : 0,
+            });
+
+            return {
+                ...latestRow,
+                memorizationLessons: agg.memorizationLessons.join(', '),
+                memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
+                reviewLessons: agg.reviewLessons.join(', '),
+                reviewPages: createAchievement(agg.revAchieved, agg.revRequired),
+                consolidationPages: createAchievement(agg.conAchieved, agg.conRequired),
+                attendance: entryCount > 0 ? agg.attendanceSum / entryCount : 0,
+                totalPoints: agg.pointsSum,
+                hasMultipleEntries: true,
+            };
+        });
     }, [students]);
 
-    // Memoized, interconnected lists for filters, based on studentsWithNotes
+    // Memoized, interconnected lists for filters, following a strict hierarchy.
+    const timeOptions = useMemo(() => {
+        const times = new Set<string>(studentsWithNotes.map(s => s.circleTime).filter(item => item));
+        return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
+    }, [studentsWithNotes]);
+    
     const teacherOptions = useMemo(() => {
         const filteredStudents = selectedCircleTime
             ? studentsWithNotes.filter(s => s.circleTime === selectedCircleTime)
             : studentsWithNotes;
-        // FIX: Explicitly type the Set to string to help with type inference.
         const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
         return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [studentsWithNotes, selectedCircleTime]);
 
     const circleOptions = useMemo(() => {
         let filteredStudents = studentsWithNotes;
-        if (selectedTeacher) {
-            filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
-        }
         if (selectedCircleTime) {
             filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
         }
-        // FIX: Explicitly type the Set to string to help with type inference.
-        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
-        return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsWithNotes, selectedTeacher, selectedCircleTime]);
-
-    const timeOptions = useMemo(() => {
-        let filteredStudents = studentsWithNotes;
         if (selectedTeacher) {
             filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
         }
-        if (selectedCircle) {
-            filteredStudents = filteredStudents.filter(s => s.circle === selectedCircle);
-        }
-        // FIX: Explicitly type the Set to string to help with type inference.
-        const times = new Set<string>(filteredStudents.map(s => s.circleTime).filter(item => item));
-        return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsWithNotes, selectedTeacher, selectedCircle]);
-
-    // Effects to reset selections if they become invalid
+        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+        return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
+    }, [studentsWithNotes, selectedCircleTime, selectedTeacher]);
+    
+    // Effects to reset selections if they become invalid (safety net)
     useEffect(() => {
         if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
             setSelectedTeacher('');
@@ -74,32 +148,20 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         }
     }, [selectedCircle, circleOptions]);
 
-    useEffect(() => {
-        if (selectedCircleTime && !timeOptions.includes(selectedCircleTime)) {
-            setSelectedCircleTime('');
-        }
-    }, [selectedCircleTime, timeOptions]);
-
-    const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle', value: string) => {
+    const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle' | 'week', value: string) => {
         if (filterType === 'time') {
             setSelectedCircleTime(value);
-            if (!value) {
-                setSelectedTeacher('');
-                setSelectedCircle('');
-            }
+            // Reset downstream filters
+            setSelectedTeacher('');
+            setSelectedCircle('');
         } else if (filterType === 'teacher') {
             setSelectedTeacher(value);
+            // Reset downstream filter
             setSelectedCircle('');
         } else if (filterType === 'circle') {
             setSelectedCircle(value);
-            if (value) {
-                const studentForCircle = studentsWithNotes.find(s => s.circle === value);
-                if (studentForCircle) {
-                    if (!selectedTeacher) setSelectedTeacher(studentForCircle.teacherName);
-                    if (!selectedCircleTime) setSelectedCircleTime(studentForCircle.circleTime);
-                }
-            }
         }
+        // 'week' case is not handled as it's not used here
     };
 
     const handleClearFilters = () => {
@@ -109,7 +171,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         setSelectedCircle('');
     };
     
-    const filteredAndSortedStudents = useMemo(() => {
+    const { filteredAndSortedStudents, summary } = useMemo(() => {
         let studentsToProcess = studentsWithNotes;
         
         if (searchQuery) {
@@ -117,7 +179,6 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
                 student.studentName.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
-
         if (selectedCircleTime) {
             studentsToProcess = studentsToProcess.filter(student => student.circleTime === selectedCircleTime);
         }
@@ -152,8 +213,19 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
                 return sortConfig.direction === 'ascending' ? comparison : -comparison;
             });
         }
+        
+        const summary = {
+            totalMemorizationAchieved: sortableStudents.reduce((acc, s) => acc + s.memorizationPages.achieved, 0),
+            totalMemorizationRequired: sortableStudents.reduce((acc, s) => acc + s.memorizationPages.required, 0),
+            totalReviewAchieved: sortableStudents.reduce((acc, s) => acc + s.reviewPages.achieved, 0),
+            totalReviewRequired: sortableStudents.reduce((acc, s) => acc + s.reviewPages.required, 0),
+            totalConsolidationAchieved: sortableStudents.reduce((acc, s) => acc + s.consolidationPages.achieved, 0),
+            totalConsolidationRequired: sortableStudents.reduce((acc, s) => acc + s.consolidationPages.required, 0),
+            avgAttendance: sortableStudents.length > 0 ? sortableStudents.reduce((acc, s) => acc + s.attendance, 0) / sortableStudents.length : 0,
+            totalPoints: sortableStudents.reduce((acc, s) => acc + s.totalPoints, 0),
+        };
 
-        return sortableStudents;
+        return { filteredAndSortedStudents: sortableStudents, summary };
     }, [studentsWithNotes, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery]);
 
     const handleSort = (key: SortKey) => {
@@ -185,12 +257,15 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
                 selectedCircle={selectedCircle}
                 onFilterChange={handleFilterChange}
                 onClearFilters={handleClearFilters}
+                showWeekFilter={false}
             />
+            {/* FIX: Pass the summary prop to ReportTable to resolve the missing property error. */}
             <ReportTable
                 students={filteredAndSortedStudents}
                 onRowClick={setSelectedStudent}
                 sortConfig={sortConfig}
                 onSort={handleSort}
+                summary={summary}
             />
             {selectedStudent && (
                 <StudentDetailModal

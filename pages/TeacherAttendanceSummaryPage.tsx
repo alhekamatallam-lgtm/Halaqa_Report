@@ -38,11 +38,18 @@ const TeacherAttendanceSummaryPage: React.FC<TeacherAttendanceSummaryPageProps> 
       }
     });
 
+    // FIX: Calculate `attendanceRate` to match the `TeacherAttendanceSummaryEntry` type.
     return Array.from(summaryMap.entries())
-      .map(([teacherName, data]) => ({
-        teacherName,
-        ...data,
-      }))
+      .map(([teacherName, data]) => {
+        const { presentDays, absentDays } = data;
+        const totalDays = presentDays + absentDays;
+        return {
+          teacherName,
+          presentDays,
+          absentDays,
+          attendanceRate: totalDays > 0 ? presentDays / totalDays : 0,
+        };
+      })
       .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ar'));
   }, [reportData, startDate, endDate]);
 

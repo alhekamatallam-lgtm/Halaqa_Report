@@ -7,8 +7,11 @@ interface CircleFilterControlsProps {
   selectedCircleTime: string;
   allTeachers: string[];
   selectedTeacher: string;
-  onFilterChange: (filterType: 'time' | 'teacher', value: string) => void;
+  allWeeks?: string[];
+  selectedWeek?: string;
+  onFilterChange: (filterType: 'time' | 'teacher' | 'week', value: string) => void;
   onClearFilters: () => void;
+  showWeekFilter?: boolean;
 }
 
 const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
@@ -18,12 +21,17 @@ const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
   selectedCircleTime,
   allTeachers,
   selectedTeacher,
+  allWeeks = [],
+  selectedWeek = '',
   onFilterChange,
   onClearFilters,
+  showWeekFilter = true,
 }) => {
+  const gridColsClass = showWeekFilter ? 'md:grid-cols-5' : 'md:grid-cols-4';
+
   return (
-    <div className="mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+    <div className="mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
+        <div className={`grid grid-cols-1 ${gridColsClass} gap-4 items-end`}>
           <div>
             <label htmlFor="search-circle-filter" className="block text-sm font-medium text-stone-700 mb-2">بحث بالحلقة</label>
             <div className="relative">
@@ -74,6 +82,24 @@ const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
               ))}
             </select>
           </div>
+           {showWeekFilter && (
+            <div>
+              <label htmlFor="week-circle-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة حسب الأسبوع</label>
+              <select
+                id="week-circle-filter"
+                className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                value={selectedWeek}
+                onChange={(e) => onFilterChange('week', e.target.value)}
+              >
+                <option value="">كل الأسابيع</option>
+                {allWeeks.map((week) => (
+                  <option key={week} value={week}>
+                    {week}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <button
               onClick={onClearFilters}

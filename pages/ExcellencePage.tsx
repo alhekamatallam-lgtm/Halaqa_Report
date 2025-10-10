@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ProcessedStudentData, ExcellenceReportData } from '../types';
 import ExcellenceReportTable from '../components/ExcellenceReportTable';
+import CircleFilterControls from '../components/CircleFilterControls';
 import { CrownIcon } from '../components/icons';
 
 interface ExcellencePageProps {
@@ -65,14 +66,21 @@ const PodiumCard: React.FC<{ rank: number; circle: ExcellenceReportData | undefi
 
 
 const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
+  const [selectedWeek, setSelectedWeek] = useState('');
+  
+  const asrStudents = useMemo(() => students.filter(student => student.circleTime === 'العصر'), [students]);
+
+  const weekOptions = useMemo(() => {
+      const weeks = new Set<string>(asrStudents.map(s => s.week).filter((w): w is string => !!w));
+      return Array.from(weeks).sort((a, b) => a.localeCompare(b, 'ar'));
+  }, [asrStudents]);
 
   const rankedData: ExcellenceReportData[] = useMemo(() => {
+    const studentsToProcess = selectedWeek ? asrStudents.filter(s => s.week === selectedWeek) : asrStudents;
+
     const circlesMap = new Map<string, ProcessedStudentData[]>();
 
-    // فلترة الطلاب لعرض حلقات فترة العصر فقط
-    const asrStudents = students.filter(student => student.circleTime === 'العصر');
-
-    asrStudents.forEach(student => {
+    studentsToProcess.forEach(student => {
       if (!circlesMap.has(student.circle)) {
         circlesMap.set(student.circle, []);
       }
@@ -84,7 +92,6 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
     for (const [circleName, circleStudents] of circlesMap.entries()) {
         if (circleStudents.length === 0) continue;
 
-        // تجاهل حلقات التبيان من الترتيب
         if (circleName.includes('التبيان')) {
             continue;
         }
@@ -105,7 +112,6 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
         
         const avgGeneralIndex = (avgMemorizationIndex + avgReviewIndex + avgConsolidationIndex) / 3;
         
-        // مؤشر التميز: (متوسط مؤشر الحفظ + متوسط نسبة الحضور) / 2
         const excellenceScore = (avgMemorizationIndex + avgAttendance) / 2;
 
         report.push({
@@ -125,19 +131,44 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
         });
     }
 
-    // Sort by excellence score and assign rank
     return report
         .sort((a, b) => b.excellenceScore - a.excellenceScore)
         .map((circle, index) => ({
             ...circle,
             rank: index + 1
         }));
-  }, [students]);
+  }, [asrStudents, selectedWeek]);
+
+  const handleFilterChange = (filterType: 'time' | 'teacher' | 'week', value: string) => {
+    if (filterType === 'week') {
+      setSelectedWeek(value);
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSelectedWeek('');
+  };
 
   const [first, second, third] = rankedData;
+  const reportTitle = selectedWeek ? `تميز الحلقات للأسبوع: ${selectedWeek}` : 'تميز الحلقات (العرض المجمع)';
 
   return (
     <div className="space-y-12">
+      <CircleFilterControls
+        searchQuery=""
+        onSearchChange={() => {}}
+        allCircleTimes={[]}
+        selectedCircleTime=""
+        allTeachers={[]}
+        selectedTeacher=""
+        allWeeks={weekOptions}
+        selectedWeek={selectedWeek}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
+       />
+       <div className="mb-4 text-center">
+          <h4 className="text-xl font-bold text-stone-800">{reportTitle}</h4>
+      </div>
       <div className="flex flex-col md:flex-row items-end justify-center gap-1">
           <PodiumCard rank={2} circle={second} />
           <PodiumCard rank={1} circle={first} />

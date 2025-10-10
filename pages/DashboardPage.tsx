@@ -59,11 +59,17 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
   const [selectedCircleTime, setSelectedCircleTime] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedCircle, setSelectedCircle] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState('');
 
+  const studentsForWeek = useMemo(() => {
+    if (!selectedWeek) return students;
+    return students.filter(s => s.week === selectedWeek);
+  }, [students, selectedWeek]);
+  
   const aggregatedData = useMemo(() => {
     const circlesMap = new Map<string, ProcessedStudentData[]>();
 
-    students.forEach(student => {
+    studentsForWeek.forEach(student => {
       if (!circlesMap.has(student.circle)) {
         circlesMap.set(student.circle, []);
       }
@@ -112,45 +118,40 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       });
     }
     return report.sort((a,b) => a.circleName.localeCompare(b.circleName, 'ar'));
+  }, [studentsForWeek]);
+
+  // Memoized, interconnected lists for filters, following a strict hierarchy.
+  const weekOptions = useMemo(() => {
+    const weeks = new Set<string>(students.map(s => s.week).filter((w): w is string => !!w));
+    return Array.from(weeks).sort((a,b) => a.localeCompare(b, 'ar'));
   }, [students]);
 
-  // Memoized, interconnected lists for filters
+  const timeOptions = useMemo(() => {
+      const times = new Set<string>(studentsForWeek.map(s => s.circleTime).filter(item => item));
+      return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
+  }, [studentsForWeek]);
+
   const teacherOptions = useMemo(() => {
     const filteredStudents = selectedCircleTime
-        ? students.filter(s => s.circleTime === selectedCircleTime)
-        : students;
-    // FIX: Explicitly type the Set to string to help with type inference.
+        ? studentsForWeek.filter(s => s.circleTime === selectedCircleTime)
+        : studentsForWeek;
     const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
     return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [students, selectedCircleTime]);
+  }, [studentsForWeek, selectedCircleTime]);
 
   const circleOptions = useMemo(() => {
-      let filteredStudents = students;
-      if (selectedTeacher) {
-          filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
-      }
+      let filteredStudents = studentsForWeek;
       if (selectedCircleTime) {
           filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
       }
-      // FIX: Explicitly type the Set to string to help with type inference.
-      const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
-      return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [students, selectedTeacher, selectedCircleTime]);
-
-  const timeOptions = useMemo(() => {
-      let filteredStudents = students;
       if (selectedTeacher) {
           filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
       }
-      if (selectedCircle) {
-          filteredStudents = filteredStudents.filter(s => s.circle === selectedCircle);
-      }
-      // FIX: Explicitly type the Set to string to help with type inference.
-      const times = new Set<string>(filteredStudents.map(s => s.circleTime).filter(item => item));
-      return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [students, selectedTeacher, selectedCircle]);
+      const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+      return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
+  }, [studentsForWeek, selectedCircleTime, selectedTeacher]);
 
-  // Effects to reset selections if they become invalid
+  // Effects to reset selections if they become invalid (safety net)
   useEffect(() => {
       if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
           setSelectedTeacher('');
@@ -163,31 +164,21 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       }
   }, [selectedCircle, circleOptions]);
 
-  useEffect(() => {
-      if (selectedCircleTime && !timeOptions.includes(selectedCircleTime)) {
-          setSelectedCircleTime('');
-      }
-  }, [selectedCircleTime, timeOptions]);
-
-  const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle', value: string) => {
-    if (filterType === 'time') {
+  const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle' | 'week', value: string) => {
+    if (filterType === 'week') {
+        setSelectedWeek(value);
+        setSelectedCircleTime('');
+        setSelectedTeacher('');
+        setSelectedCircle('');
+    } else if (filterType === 'time') {
         setSelectedCircleTime(value);
-        if (!value) {
-            setSelectedTeacher('');
-            setSelectedCircle('');
-        }
+        setSelectedTeacher('');
+        setSelectedCircle('');
     } else if (filterType === 'teacher') {
         setSelectedTeacher(value);
         setSelectedCircle('');
     } else if (filterType === 'circle') {
         setSelectedCircle(value);
-        if (value) {
-            const studentForCircle = students.find(s => s.circle === value);
-            if (studentForCircle) {
-                if (!selectedTeacher) setSelectedTeacher(studentForCircle.teacherName);
-                if (!selectedCircleTime) setSelectedCircleTime(studentForCircle.circleTime);
-            }
-        }
     }
   };
   
@@ -196,6 +187,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
     setSelectedCircleTime('');
     setSelectedTeacher('');
     setSelectedCircle('');
+    setSelectedWeek('');
   };
 
   const filteredData = useMemo(() => {
@@ -204,20 +196,20 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       if (searchQuery) {
           circlesToProcess = circlesToProcess.filter(c => c.circleName.toLowerCase().includes(searchQuery.toLowerCase()));
       }
-      if (selectedCircle) {
-          circlesToProcess = circlesToProcess.filter(c => c.circleName === selectedCircle);
+      if (selectedCircleTime) {
+        const studentsInTime = studentsForWeek.filter(s => s.circleTime === selectedCircleTime);
+        const circlesInTime = new Set(studentsInTime.map(s => s.circle));
+        circlesToProcess = circlesToProcess.filter(c => circlesInTime.has(c.circleName));
       }
       if (selectedTeacher) {
           circlesToProcess = circlesToProcess.filter(c => c.teacherName === selectedTeacher);
       }
-      if (selectedCircleTime) {
-        const studentsInTime = students.filter(s => s.circleTime === selectedCircleTime);
-        const circlesInTime = new Set(studentsInTime.map(s => s.circle));
-        circlesToProcess = circlesToProcess.filter(c => circlesInTime.has(c.circleName));
+      if (selectedCircle) {
+          circlesToProcess = circlesToProcess.filter(c => c.circleName === selectedCircle);
       }
 
       return circlesToProcess;
-  }, [aggregatedData, searchQuery, selectedCircleTime, selectedTeacher, selectedCircle, students]);
+  }, [aggregatedData, searchQuery, selectedCircleTime, selectedTeacher, selectedCircle, studentsForWeek]);
 
 
   return (
@@ -233,8 +225,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
         selectedTeacher={selectedTeacher}
         availableCircles={circleOptions}
         selectedCircle={selectedCircle}
+        allWeeks={weekOptions}
+        selectedWeek={selectedWeek}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
+        showWeekFilter={true}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
         {filteredData.map(circle => (

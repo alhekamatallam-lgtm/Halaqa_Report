@@ -63,12 +63,13 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
     }
 
     const totalCircles = new Set(students.map(s => s.circle)).size;
-    const totalStudents = students.length;
+    const totalStudents = new Set(students.map(s => s.username)).size; // Count unique students
     const totalMemorization = students.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
     const totalReview = students.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
     const totalConsolidation = students.reduce((sum, s) => sum + s.consolidationPages.achieved, 0);
     const totalAchievement = totalMemorization + totalReview + totalConsolidation;
-    const avgAttendance = students.reduce((sum, s) => sum + s.attendance, 0) / totalStudents;
+    // Calculate average attendance across all entries, not unique students
+    const avgAttendance = students.length > 0 ? students.reduce((sum, s) => sum + s.attendance, 0) / students.length : 0;
 
     return {
       totalCircles, totalStudents, totalMemorization, totalReview,
@@ -79,7 +80,7 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
       <StatCard icon={<CircleIcon />} label="عدد الحلقات" value={stats.totalCircles} />
-      <StatCard icon={<StudentIcon />} label="عدد الطلاب" value={stats.totalStudents} />
+      <StatCard icon={<StudentIcon />} label="عدد الطلاب" value={stats.totalStudents} description="العدد الفعلي للطلاب بدون تكرار" />
       <StatCard icon={<AttendanceIcon />} label="متوسط نسبة الحضور" value={`${(stats.avgAttendance * 100).toFixed(1)}%`} />
       
       <StatCard icon={<BookIcon />} label="إجمالي أوجه الحفظ" value={stats.totalMemorization.toFixed(1)} />

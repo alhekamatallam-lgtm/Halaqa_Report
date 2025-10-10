@@ -251,79 +251,77 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
 
 
 const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
+    const processed: ProcessedStudentData[] = [];
+    let lastStudent: ProcessedStudentData | null = null;
+
     const normalize = (val: any): string => {
         const str = String(val || '');
         return str
-            .normalize('NFC') 
+            .normalize('NFC')
             .replace(/[\u200B-\u200D\uFEFF]/g, '')
             .trim()
             .replace(/\s+/g, ' ');
     };
-
-    const studentsMap = new Map<number, ProcessedStudentData>();
-    let lastStudentUsername: number | null = null;
 
     for (const item of data) {
         const username = item["اسم المستخدم"];
         const studentName = normalize(item["الطالب"]);
 
         if (studentName && username) {
-            lastStudentUsername = username;
-            const processedStudent: ProcessedStudentData = {
-                studentName: studentName,
-                username: username,
-                circle: normalize(item["الحلقة"]),
+            const circle = normalize(item["الحلقة"]);
+            const isTabyan = circle.includes('التبيان');
+
+            const zeroAchievement = (achievement: Achievement): Achievement => ({
+                ...achievement,
+                achieved: 0,
+                formatted: `0 / ${achievement.required.toFixed(1)}`,
+                index: 0,
+            });
+
+            let memPages = parseAchievement(item["أوجه الحفظ"]);
+            let revPages = parseAchievement(item["أوجه المراجه"]);
+            let conPages = parseAchievement(item["أوجه التثبيت"]);
+
+            if (isTabyan) {
+                memPages = zeroAchievement(memPages);
+                revPages = zeroAchievement(revPages);
+                conPages = zeroAchievement(conPages);
+            }
+
+            const student: ProcessedStudentData = {
+                studentName,
+                username,
+                circle,
                 circleTime: normalize(item["وقت الحلقة"]),
                 memorizationLessons: normalize(item["دروس الحفظ"]),
-                memorizationPages: parseAchievement(item["أوجه الحفظ"]),
+                memorizationPages: memPages,
                 reviewLessons: normalize(item["دروس المراجعة"]),
-                reviewPages: parseAchievement(item["أوجه المراجه"]),
-                consolidationPages: parseAchievement(item["أوجه التثبيت"]),
+                reviewPages: revPages,
+                consolidationPages: conPages,
                 teacherName: normalize(item["اسم المعلم"]),
                 program: normalize(item["البرنامج"]),
-                attendance: item["نسبة الحضور"] || 0,
+                attendance: parsePercentage(item["نسبة الحضور"]),
                 totalPoints: item["اجمالي النقاط"] || 0,
                 guardianMobile: normalize(item["جوال ولي الأمر"]),
-                hasMultipleEntries: false,
+                week: normalize(item["الأسبوع"] || item["الاسبوع"]),
             };
-
-            if (processedStudent.circle.includes('التبيان')) {
-                const zeroAchievement = (achievement: Achievement): Achievement => ({
-                    ...achievement,
-                    achieved: 0,
-                    formatted: `0 / ${achievement.required}`,
-                    index: 0,
-                });
-                processedStudent.memorizationPages = zeroAchievement(processedStudent.memorizationPages);
-                processedStudent.reviewPages = zeroAchievement(processedStudent.reviewPages);
-                processedStudent.consolidationPages = zeroAchievement(processedStudent.consolidationPages);
+            processed.push(student);
+            lastStudent = student;
+        } else if (lastStudent) {
+            const newMemorization = normalize(item["دروس الحفظ"]);
+            if (newMemorization && newMemorization.trim() !== '') {
+                lastStudent.memorizationLessons += `, ${newMemorization}`;
             }
-            
-            studentsMap.set(username, processedStudent);
-        } else if (lastStudentUsername) {
-            const existingStudent = studentsMap.get(lastStudentUsername);
-            if (existingStudent) {
-                let isMerged = false;
-                const newMemorization = normalize(item["دروس الحفظ"]);
-                if (newMemorization && newMemorization.trim() !== '') {
-                    existingStudent.memorizationLessons += `, ${newMemorization}`;
-                    isMerged = true;
-                }
 
-                const newReview = normalize(item["دروس المراجعة"]);
-                if (newReview && newReview.trim() !== '') {
-                    existingStudent.reviewLessons += `, ${newReview}`;
-                    isMerged = true;
-                }
-                if (isMerged) {
-                    existingStudent.hasMultipleEntries = true;
-                }
+            const newReview = normalize(item["دروس المراجعة"]);
+            if (newReview && newReview.trim() !== '') {
+                lastStudent.reviewLessons += `, ${newReview}`;
             }
         }
     }
-
-    return Array.from(studentsMap.values());
+    return processed;
 };
+
 
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
@@ -390,7 +388,16 @@ const App: React.FC = () => {
                      console.warn("لم يتم العثور على ورقة بيانات الطلاب.");
                 }
                 
-                const processedStudents = processData(allStudentsRaw as RawStudentData[]);
+                const sanitizedStudentsRaw = allStudentsRaw.map(row => {
+                    const newRow: { [key: string]: any } = {};
+                    Object.keys(row).forEach(key => {
+                        const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
+                        newRow[cleanedKey] = row[key];
+                    });
+                    return newRow;
+                });
+                
+                const processedStudents = processData(sanitizedStudentsRaw as RawStudentData[]);
                 setStudents(processedStudents);
                 
                 const evaluationSheetData = dataContainer['Evaluation_Sheet'];
