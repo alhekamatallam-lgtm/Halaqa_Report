@@ -343,6 +343,7 @@ const App: React.FC = () => {
     const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
     const asrTeachersInfo = useMemo(() => {
         const teacherInfoMap = new Map<string, TeacherInfo>();
@@ -614,6 +615,7 @@ const App: React.FC = () => {
                         onSubmit={handlePostTeacherAttendance}
                         isSubmitting={isSubmitting}
                         submittingTeacher={submittingTeacher}
+                        setHeaderVisible={setIsHeaderVisible}
                     />
                 );
             case 'teacherAttendanceReport':
@@ -630,17 +632,19 @@ const App: React.FC = () => {
     return (
         <div className="bg-stone-100 min-h-screen font-sans">
             <Notification notification={notification} onClose={() => setNotification(null)} />
-            <header className="bg-stone-800/95 backdrop-blur-sm text-white shadow-lg pb-4 sticky top-0 z-40 print-hidden">
-                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center pt-6">
-                        <h2 className="text-xl font-semibold text-stone-200">مجمع الراجحي بشبرا</h2>
+            {isHeaderVisible && (
+                <header className="bg-stone-800/95 backdrop-blur-sm text-white shadow-lg pb-4 sticky top-0 z-40 print-hidden">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="text-center pt-6">
+                            <h2 className="text-xl font-semibold text-stone-200">مجمع الراجحي بشبرا</h2>
+                        </div>
+                        <h1 className="text-4xl font-bold leading-tight text-center text-amber-400 pt-2 pb-6" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.6)'}}>
+                        {titles[currentPage]}
+                        </h1>
                     </div>
-                    <h1 className="text-4xl font-bold leading-tight text-center text-amber-400 pt-2 pb-6" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.6)'}}>
-                       {titles[currentPage]}
-                    </h1>
-                </div>
-                <Nav currentPage={currentPage} onNavigate={handleNavigation} />
-            </header>
+                    <Nav currentPage={currentPage} onNavigate={handleNavigation} />
+                </header>
+            )}
             <main className={mainContainerClass}>
                 <div className="animate-slide-in">
                   {renderPage()}
