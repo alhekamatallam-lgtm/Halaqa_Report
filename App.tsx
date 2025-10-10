@@ -251,8 +251,8 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
 
 
 const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
-    const processed: ProcessedStudentData[] = [];
-    let lastStudent: ProcessedStudentData | null = null;
+    const studentWeekMap = new Map<string, ProcessedStudentData>();
+    let lastKey: string | null = null;
 
     const normalize = (val: any): string => {
         const str = String(val || '');
@@ -266,60 +266,94 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
     for (const item of data) {
         const username = item["اسم المستخدم"];
         const studentName = normalize(item["الطالب"]);
+        const week = normalize(item["الأسبوع"] || item["الاسبوع"]);
 
-        if (studentName && username) {
+        let currentKey: string | null = null;
+        
+        if (username && studentName && week) {
+            currentKey = `${username}-${week}`;
+            lastKey = currentKey;
+        } else {
+            currentKey = lastKey;
+        }
+        
+        if (!currentKey) {
+            continue;
+        }
+
+        const memPages = parseAchievement(item["أوجه الحفظ"]);
+        const revPages = parseAchievement(item["أوجه المراجه"]);
+        const conPages = parseAchievement(item["أوجه التثبيت"]);
+        const points = item["اجمالي النقاط"] || 0;
+        const attendance = parsePercentage(item["نسبة الحضور"]);
+        const memLessons = normalize(item["دروس الحفظ"]);
+        const revLessons = normalize(item["دروس المراجعة"]);
+
+        if (studentWeekMap.has(currentKey)) {
+            const existingStudent = studentWeekMap.get(currentKey)!;
+
+            existingStudent.memorizationPages.achieved += memPages.achieved;
+            existingStudent.memorizationPages.required += memPages.required;
+            existingStudent.reviewPages.achieved += revPages.achieved;
+            existingStudent.reviewPages.required += revPages.required;
+            existingStudent.consolidationPages.achieved += conPages.achieved;
+            existingStudent.consolidationPages.required += conPages.required;
+            
+            existingStudent.totalPoints += points;
+            
+            if (memLessons) {
+                existingStudent.memorizationLessons = existingStudent.memorizationLessons
+                    ? `${existingStudent.memorizationLessons}, ${memLessons}`
+                    : memLessons;
+            }
+            if (revLessons) {
+                existingStudent.reviewLessons = existingStudent.reviewLessons
+                    ? `${existingStudent.reviewLessons}, ${revLessons}`
+                    : revLessons;
+            }
+        } else {
+            if (!studentName || !username || !week) continue;
+
             const circle = normalize(item["الحلقة"]);
             const isTabyan = circle.includes('التبيان');
 
-            const zeroAchievement = (achievement: Achievement): Achievement => ({
-                ...achievement,
-                achieved: 0,
-                formatted: `0 / ${achievement.required.toFixed(1)}`,
-                index: 0,
-            });
+            const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
+            const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
+            const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
 
-            let memPages = parseAchievement(item["أوجه الحفظ"]);
-            let revPages = parseAchievement(item["أوجه المراجه"]);
-            let conPages = parseAchievement(item["أوجه التثبيت"]);
-
-            if (isTabyan) {
-                memPages = zeroAchievement(memPages);
-                revPages = zeroAchievement(revPages);
-                conPages = zeroAchievement(conPages);
-            }
-
-            const student: ProcessedStudentData = {
+            const newStudent: ProcessedStudentData = {
                 studentName,
                 username,
                 circle,
                 circleTime: normalize(item["وقت الحلقة"]),
-                memorizationLessons: normalize(item["دروس الحفظ"]),
-                memorizationPages: memPages,
-                reviewLessons: normalize(item["دروس المراجعة"]),
-                reviewPages: revPages,
-                consolidationPages: conPages,
+                memorizationLessons: memLessons,
+                memorizationPages: finalMemPages,
+                reviewLessons: revLessons,
+                reviewPages: finalRevPages,
+                consolidationPages: finalConPages,
                 teacherName: normalize(item["اسم المعلم"]),
                 program: normalize(item["البرنامج"]),
-                attendance: parsePercentage(item["نسبة الحضور"]),
-                totalPoints: item["اجمالي النقاط"] || 0,
+                attendance: attendance,
+                totalPoints: points,
                 guardianMobile: normalize(item["جوال ولي الأمر"]),
-                week: normalize(item["الأسبوع"] || item["الاسبوع"]),
+                week: week,
             };
-            processed.push(student);
-            lastStudent = student;
-        } else if (lastStudent) {
-            const newMemorization = normalize(item["دروس الحفظ"]);
-            if (newMemorization && newMemorization.trim() !== '') {
-                lastStudent.memorizationLessons += `, ${newMemorization}`;
-            }
-
-            const newReview = normalize(item["دروس المراجعة"]);
-            if (newReview && newReview.trim() !== '') {
-                lastStudent.reviewLessons += `, ${newReview}`;
-            }
+            studentWeekMap.set(currentKey, newStudent);
         }
     }
-    return processed;
+
+    studentWeekMap.forEach(student => {
+        student.memorizationPages.formatted = `${student.memorizationPages.achieved.toFixed(1)} / ${student.memorizationPages.required.toFixed(1)}`;
+        student.memorizationPages.index = student.memorizationPages.required > 0 ? student.memorizationPages.achieved / student.memorizationPages.required : 0;
+        
+        student.reviewPages.formatted = `${student.reviewPages.achieved.toFixed(1)} / ${student.reviewPages.required.toFixed(1)}`;
+        student.reviewPages.index = student.reviewPages.required > 0 ? student.reviewPages.achieved / student.reviewPages.required : 0;
+
+        student.consolidationPages.formatted = `${student.consolidationPages.achieved.toFixed(1)} / ${student.consolidationPages.required.toFixed(1)}`;
+        student.consolidationPages.index = student.consolidationPages.required > 0 ? student.consolidationPages.achieved / student.consolidationPages.required : 0;
+    });
+
+    return Array.from(studentWeekMap.values());
 };
 
 
