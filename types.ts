@@ -46,6 +46,7 @@ export interface ProcessedStudentData {
 export interface CircleReportData {
   circleName: string;
   teacherName: string;
+  supervisorName: string;
   studentCount: number;
   totalMemorizationAchieved: number;
   avgMemorizationIndex: number;

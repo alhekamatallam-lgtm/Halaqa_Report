@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import type { ProcessedStudentData, ExcellenceReportData } from '../types';
+import type { ProcessedStudentData, ExcellenceReportData, SupervisorData } from '../types';
 import ExcellenceReportTable from '../components/ExcellenceReportTable';
 import CircleFilterControls from '../components/CircleFilterControls';
 import { CrownIcon } from '../components/icons';
 
 interface ExcellencePageProps {
   students: ProcessedStudentData[];
+  supervisors: SupervisorData[];
 }
 
 const PodiumCard: React.FC<{ rank: number; circle: ExcellenceReportData | undefined }> = ({ rank, circle }) => {
@@ -65,7 +66,7 @@ const PodiumCard: React.FC<{ rank: number; circle: ExcellenceReportData | undefi
 };
 
 
-const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
+const ExcellencePage: React.FC<ExcellencePageProps> = ({ students, supervisors }) => {
   const [selectedWeek, setSelectedWeek] = useState('');
   
   const asrStudents = useMemo(() => students.filter(student => student.circleTime === 'العصر'), [students]);
@@ -77,6 +78,13 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
 
   const rankedData: ExcellenceReportData[] = useMemo(() => {
     const studentsToProcess = selectedWeek ? asrStudents.filter(s => s.week === selectedWeek) : asrStudents;
+
+    const supervisorMap = new Map<string, string>();
+    supervisors.forEach(supervisor => {
+        supervisor.circles.forEach(circle => {
+            supervisorMap.set(circle, supervisor.supervisorName);
+        });
+    });
 
     const circlesMap = new Map<string, ProcessedStudentData[]>();
 
@@ -117,6 +125,7 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
         report.push({
             circleName,
             teacherName: circleStudents[0]?.teacherName || 'غير محدد',
+            supervisorName: supervisorMap.get(circleName) || 'غير محدد',
             studentCount,
             totalMemorizationAchieved,
             avgMemorizationIndex,
@@ -137,7 +146,7 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students }) => {
             ...circle,
             rank: index + 1
         }));
-  }, [asrStudents, selectedWeek]);
+  }, [asrStudents, selectedWeek, supervisors]);
 
   const handleFilterChange = (filterType: 'time' | 'teacher' | 'week', value: string) => {
     if (filterType === 'week') {

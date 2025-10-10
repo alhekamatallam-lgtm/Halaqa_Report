@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import type { ProcessedStudentData, CircleReportData } from '../types';
+import type { ProcessedStudentData, CircleReportData, SupervisorData } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
 import FilterControls from '../components/FilterControls';
 
@@ -52,9 +52,10 @@ const CircleCard: React.FC<CircleCardProps> = ({ circle, onSelect }) => (
 interface DashboardPageProps {
   students: ProcessedStudentData[];
   onCircleSelect: (circleName: string) => void;
+  supervisors: SupervisorData[];
 }
 
-const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect }) => {
+const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect, supervisors }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCircleTime, setSelectedCircleTime] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
@@ -67,6 +68,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
   }, [students, selectedWeek]);
   
   const aggregatedData = useMemo(() => {
+    const supervisorMap = new Map<string, string>();
+    supervisors.forEach(supervisor => {
+        supervisor.circles.forEach(circle => {
+            supervisorMap.set(circle, supervisor.supervisorName);
+        });
+    });
+
     const circlesMap = new Map<string, ProcessedStudentData[]>();
 
     studentsForWeek.forEach(student => {
@@ -105,6 +113,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       report.push({
         circleName,
         teacherName: circleStudents[0]?.teacherName || 'غير محدد',
+        supervisorName: supervisorMap.get(circleName) || 'غير محدد',
         studentCount,
         totalMemorizationAchieved,
         avgMemorizationIndex,
@@ -118,7 +127,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect 
       });
     }
     return report.sort((a,b) => a.circleName.localeCompare(b.circleName, 'ar'));
-  }, [studentsForWeek]);
+  }, [studentsForWeek, supervisors]);
 
   // Memoized, interconnected lists for filters, following a strict hierarchy.
   const weekOptions = useMemo(() => {

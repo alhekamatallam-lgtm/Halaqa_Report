@@ -628,15 +628,17 @@ const App: React.FC = () => {
             case 'students':
                 return <StudentReportPage students={students} initialFilter={initialStudentFilter} clearInitialFilter={() => setInitialStudentFilter(null)} />;
             case 'circles':
-                return <CircleReportPage students={students} />;
+                return <CircleReportPage students={students} supervisors={supervisors} />;
             case 'general':
                 return <GeneralReportPage students={students} />;
             case 'dashboard':
-                return <DashboardPage students={students} onCircleSelect={handleCircleSelect} />;
+// FIX: Pass supervisors prop to DashboardPage
+                return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
             case 'notes':
                 return <NotesPage students={students} />;
             case 'excellence':
-                return <ExcellencePage students={students} />;
+// FIX: Pass supervisors prop to ExcellencePage
+                return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'evaluation':
                  if (!authenticatedUser) return null;
                 return (

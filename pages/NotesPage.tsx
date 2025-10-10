@@ -19,112 +19,56 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
     const [selectedCircleTime, setSelectedCircleTime] = useState<string>('');
     const [selectedTeacher, setSelectedTeacher] = useState<string>('');
     const [selectedCircle, setSelectedCircle] = useState<string>('');
+    const [selectedWeek, setSelectedWeek] = useState<string>('');
 
-    // Filter students to only those with notes/multiple entries
-    const studentsWithNotes = useMemo(() => {
+    // First, identify the students who are the focus of this page (those with multiple entries)
+    const multiEntryUsernames = useMemo(() => {
         const studentEntryCounts = new Map<number, number>();
         students.forEach(s => {
             studentEntryCounts.set(s.username, (studentEntryCounts.get(s.username) || 0) + 1);
         });
-
-        const multiEntryUsernames = new Set<number>();
+        const usernames = new Set<number>();
         studentEntryCounts.forEach((count, username) => {
             if (count > 1) {
-                multiEntryUsernames.add(username);
+                usernames.add(username);
             }
         });
-
-        const studentsToAggregate = students.filter(s => multiEntryUsernames.has(s.username));
-
-        const aggregationMap = new Map<number, {
-            latestRow: ProcessedStudentData;
-            memAchieved: number;
-            memRequired: number;
-            revAchieved: number;
-            revRequired: number;
-            conAchieved: number;
-            conRequired: number;
-            pointsSum: number;
-            attendanceSum: number;
-            entryCount: number;
-            memorizationLessons: string[];
-            reviewLessons: string[];
-        }>();
-
-        studentsToAggregate.forEach(item => {
-            const { username, memorizationPages, reviewPages, consolidationPages, attendance, totalPoints, memorizationLessons, reviewLessons } = item;
-            if (!username) return;
-
-            if (aggregationMap.has(username)) {
-                const agg = aggregationMap.get(username)!;
-                agg.latestRow = item;
-                agg.memAchieved += memorizationPages.achieved;
-                agg.memRequired += memorizationPages.required;
-                agg.revAchieved += reviewPages.achieved;
-                agg.revRequired += reviewPages.required;
-                agg.conAchieved += consolidationPages.achieved;
-                agg.conRequired += consolidationPages.required;
-                agg.pointsSum += totalPoints;
-                agg.attendanceSum += attendance;
-                agg.entryCount += 1;
-                if (memorizationLessons) agg.memorizationLessons.push(memorizationLessons);
-                if (reviewLessons) agg.reviewLessons.push(reviewLessons);
-            } else {
-                aggregationMap.set(username, {
-                    latestRow: item,
-                    memAchieved: memorizationPages.achieved,
-                    memRequired: memorizationPages.required,
-                    revAchieved: reviewPages.achieved,
-                    revRequired: reviewPages.required,
-                    conAchieved: consolidationPages.achieved,
-                    conRequired: consolidationPages.required,
-                    pointsSum: totalPoints,
-                    attendanceSum: attendance,
-                    entryCount: 1,
-                    memorizationLessons: [memorizationLessons].filter(Boolean),
-                    reviewLessons: [reviewLessons].filter(Boolean),
-                });
-            }
-        });
-        
-        return Array.from(aggregationMap.values()).map(agg => {
-            const { latestRow, entryCount } = agg;
-            const createAchievement = (achieved: number, required: number): Achievement => ({
-                achieved, required,
-                formatted: `${achieved.toFixed(1)} / ${required.toFixed(1)}`,
-                index: required > 0 ? achieved / required : 0,
-            });
-
-            return {
-                ...latestRow,
-                memorizationLessons: agg.memorizationLessons.join(', '),
-                memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
-                reviewLessons: agg.reviewLessons.join(', '),
-                reviewPages: createAchievement(agg.revAchieved, agg.revRequired),
-                consolidationPages: createAchievement(agg.conAchieved, agg.conRequired),
-                attendance: entryCount > 0 ? agg.attendanceSum / entryCount : 0,
-                totalPoints: agg.pointsSum,
-                hasMultipleEntries: true,
-            };
-        });
+        return usernames;
     }, [students]);
 
-    // Memoized, interconnected lists for filters, following a strict hierarchy.
+    const baseStudentsForPage = useMemo(() => {
+        return students.filter(s => multiEntryUsernames.has(s.username));
+    }, [students, multiEntryUsernames]);
+
+    // Data source for filter dropdowns depends on the selected week
+    const studentsForFilterOptions = useMemo(() => {
+        if (!selectedWeek) {
+            return baseStudentsForPage;
+        }
+        return baseStudentsForPage.filter(s => s.week === selectedWeek);
+    }, [baseStudentsForPage, selectedWeek]);
+    
+    // Memoized, interconnected lists for filters
+    const weekOptions = useMemo(() => {
+        const weeks = new Set<string>(baseStudentsForPage.map(s => s.week).filter((w): w is string => !!w));
+        return Array.from(weeks).sort((a, b) => a.localeCompare(b, 'ar'));
+    }, [baseStudentsForPage]);
+
     const timeOptions = useMemo(() => {
-        const times = new Set<string>(studentsWithNotes.map(s => s.circleTime).filter(item => item));
+        const times = new Set<string>(studentsForFilterOptions.map(s => s.circleTime).filter(item => item));
         return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsWithNotes]);
+    }, [studentsForFilterOptions]);
     
     const teacherOptions = useMemo(() => {
         const filteredStudents = selectedCircleTime
-            ? studentsWithNotes.filter(s => s.circleTime === selectedCircleTime)
-            : studentsWithNotes;
+            ? studentsForFilterOptions.filter(s => s.circleTime === selectedCircleTime)
+            : studentsForFilterOptions;
         const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
         return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsWithNotes, selectedCircleTime]);
+    }, [studentsForFilterOptions, selectedCircleTime]);
 
     const circleOptions = useMemo(() => {
-        let filteredStudents = studentsWithNotes;
+        let filteredStudents = studentsForFilterOptions;
         if (selectedCircleTime) {
             filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
         }
@@ -133,9 +77,9 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         }
         const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
         return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsWithNotes, selectedCircleTime, selectedTeacher]);
+    }, [studentsForFilterOptions, selectedCircleTime, selectedTeacher]);
     
-    // Effects to reset selections if they become invalid (safety net)
+    // Effects to reset selections if they become invalid
     useEffect(() => {
         if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
             setSelectedTeacher('');
@@ -149,19 +93,21 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
     }, [selectedCircle, circleOptions]);
 
     const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle' | 'week', value: string) => {
-        if (filterType === 'time') {
+        if (filterType === 'week') {
+            setSelectedWeek(value);
+            setSelectedCircleTime('');
+            setSelectedTeacher('');
+            setSelectedCircle('');
+        } else if (filterType === 'time') {
             setSelectedCircleTime(value);
-            // Reset downstream filters
             setSelectedTeacher('');
             setSelectedCircle('');
         } else if (filterType === 'teacher') {
             setSelectedTeacher(value);
-            // Reset downstream filter
             setSelectedCircle('');
         } else if (filterType === 'circle') {
             setSelectedCircle(value);
         }
-        // 'week' case is not handled as it's not used here
     };
 
     const handleClearFilters = () => {
@@ -169,27 +115,106 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         setSelectedCircleTime('');
         setSelectedTeacher('');
         setSelectedCircle('');
+        setSelectedWeek('');
     };
     
     const { filteredAndSortedStudents, summary } = useMemo(() => {
-        let studentsToProcess = studentsWithNotes;
+        let dataToProcess: ProcessedStudentData[];
+
+        if (selectedWeek) {
+            // Un-aggregated data for the selected week, for students with multiple entries
+            dataToProcess = baseStudentsForPage.filter(s => s.week === selectedWeek);
+        } else {
+            // Aggregated data for students with multiple entries (original page logic)
+            const aggregationMap = new Map<number, {
+                latestRow: ProcessedStudentData;
+                memAchieved: number;
+                memRequired: number;
+                revAchieved: number;
+                revRequired: number;
+                conAchieved: number;
+                conRequired: number;
+                pointsSum: number;
+                attendanceSum: number;
+                entryCount: number;
+                memorizationLessons: string[];
+                reviewLessons: string[];
+            }>();
+
+            baseStudentsForPage.forEach(item => {
+                const { username, memorizationPages, reviewPages, consolidationPages, attendance, totalPoints, memorizationLessons, reviewLessons } = item;
+                if (!username) return;
+
+                if (aggregationMap.has(username)) {
+                    const agg = aggregationMap.get(username)!;
+                    agg.latestRow = item;
+                    agg.memAchieved += memorizationPages.achieved;
+                    agg.memRequired += memorizationPages.required;
+                    agg.revAchieved += reviewPages.achieved;
+                    agg.revRequired += reviewPages.required;
+                    agg.conAchieved += consolidationPages.achieved;
+                    agg.conRequired += consolidationPages.required;
+                    agg.pointsSum += totalPoints;
+                    agg.attendanceSum += attendance;
+                    agg.entryCount += 1;
+                    if (memorizationLessons) agg.memorizationLessons.push(memorizationLessons);
+                    if (reviewLessons) agg.reviewLessons.push(reviewLessons);
+                } else {
+                    aggregationMap.set(username, {
+                        latestRow: item,
+                        memAchieved: memorizationPages.achieved,
+                        memRequired: memorizationPages.required,
+                        revAchieved: reviewPages.achieved,
+                        revRequired: reviewPages.required,
+                        conAchieved: consolidationPages.achieved,
+                        conRequired: consolidationPages.required,
+                        pointsSum: totalPoints,
+                        attendanceSum: attendance,
+                        entryCount: 1,
+                        memorizationLessons: [memorizationLessons].filter(Boolean),
+                        reviewLessons: [reviewLessons].filter(Boolean),
+                    });
+                }
+            });
+            
+            dataToProcess = Array.from(aggregationMap.values()).map(agg => {
+                const { latestRow, entryCount } = agg;
+                const createAchievement = (achieved: number, required: number): Achievement => ({
+                    achieved, required,
+                    formatted: `${achieved.toFixed(1)} / ${required.toFixed(1)}`,
+                    index: required > 0 ? achieved / required : 0,
+                });
+
+                return {
+                    ...latestRow,
+                    memorizationLessons: agg.memorizationLessons.join(', '),
+                    memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
+                    reviewLessons: agg.reviewLessons.join(', '),
+                    reviewPages: createAchievement(agg.revAchieved, agg.revRequired),
+                    consolidationPages: createAchievement(agg.conAchieved, agg.conRequired),
+                    attendance: entryCount > 0 ? agg.attendanceSum / entryCount : 0,
+                    totalPoints: agg.pointsSum,
+                    hasMultipleEntries: true,
+                };
+            });
+        }
         
         if (searchQuery) {
-            studentsToProcess = studentsToProcess.filter(student =>
+            dataToProcess = dataToProcess.filter(student =>
                 student.studentName.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
         if (selectedCircleTime) {
-            studentsToProcess = studentsToProcess.filter(student => student.circleTime === selectedCircleTime);
+            dataToProcess = dataToProcess.filter(student => student.circleTime === selectedCircleTime);
         }
         if (selectedTeacher) {
-            studentsToProcess = studentsToProcess.filter(student => student.teacherName === selectedTeacher);
+            dataToProcess = dataToProcess.filter(student => student.teacherName === selectedTeacher);
         }
         if (selectedCircle) {
-            studentsToProcess = studentsToProcess.filter(student => student.circle === selectedCircle);
+            dataToProcess = dataToProcess.filter(student => student.circle === selectedCircle);
         }
 
-        const sortableStudents = [...studentsToProcess];
+        const sortableStudents = [...dataToProcess];
 
         if (sortConfig !== null) {
             sortableStudents.sort((a, b) => {
@@ -226,7 +251,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         };
 
         return { filteredAndSortedStudents: sortableStudents, summary };
-    }, [studentsWithNotes, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery]);
+    }, [baseStudentsForPage, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek]);
 
     const handleSort = (key: SortKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
@@ -236,10 +261,10 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         setSortConfig({ key, direction });
     };
 
-    if (studentsWithNotes.length === 0) {
+    if (baseStudentsForPage.length === 0) {
         return (
             <div className="text-center py-10 bg-white rounded-lg shadow-md">
-                <p className="text-lg text-gray-600">لا توجد ملاحظات لعرضها حاليًا.</p>
+                <p className="text-lg text-gray-600">لا توجد ملاحظات لعرضها حاليًا (لا يوجد طلاب لديهم إدخالات متعددة).</p>
             </div>
         );
     }
@@ -255,11 +280,12 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
                 selectedTeacher={selectedTeacher}
                 availableCircles={circleOptions}
                 selectedCircle={selectedCircle}
+                allWeeks={weekOptions}
+                selectedWeek={selectedWeek}
                 onFilterChange={handleFilterChange}
                 onClearFilters={handleClearFilters}
-                showWeekFilter={false}
+                showWeekFilter={true}
             />
-            {/* FIX: Pass the summary prop to ReportTable to resolve the missing property error. */}
             <ReportTable
                 students={filteredAndSortedStudents}
                 onRowClick={setSelectedStudent}

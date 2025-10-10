@@ -42,6 +42,7 @@ export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles, s
           <tr>
             <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">الحلقة</th>
             <th scope="col" className="hidden md:table-cell px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">المعلم</th>
+            <th scope="col" className="hidden md:table-cell px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">المشرف التعليمي</th>
             <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">أوجه الحفظ / المؤشر</th>
             <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">أوجه المراجعة / المؤشر</th>
             <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">أوجه التثبيت / المؤشر</th>
@@ -54,6 +55,7 @@ export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles, s
             <tr key={circle.circleName} className={`transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70'} hover:bg-amber-100/60`}>
               <td className="px-6 py-4 text-sm font-medium text-stone-900 text-center">{circle.circleName}</td>
               <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{circle.teacherName}</td>
+              <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{circle.supervisorName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">
                 <div className='flex flex-col gap-1 items-center'>
                   <span>{circle.totalMemorizationAchieved.toFixed(1)}</span>
@@ -94,6 +96,7 @@ export const CircleReportTable: React.FC<CircleReportTableProps> = ({ circles, s
         <tfoot className="bg-stone-200 font-bold text-stone-800">
             <tr>
                 <td className="px-6 py-4 text-center">الإجمالي</td>
+                <td className="hidden md:table-cell px-6 py-4"></td>
                 <td className="hidden md:table-cell px-6 py-4"></td>
                 <SummaryAchievementCell achieved={summary.totalMemorizationAchieved} required={summary.totalMemorizationRequired} />
                 <SummaryAchievementCell achieved={summary.totalReviewAchieved} required={summary.totalReviewRequired} />
