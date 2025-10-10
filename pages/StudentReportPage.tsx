@@ -149,9 +149,9 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                         <thead>
                             <tr>
                                 <th>اسم الطالب</th>
-                                <th>أوجه الحفظ</th>
-                                <th>أوجه المراجعة</th>
-                                <th>أوجه التثبيت</th>
+                                <th>مؤشر الحفظ</th>
+                                <th>مؤشر المراجعة</th>
+                                <th>مؤشر التثبيت</th>
                                 <th>الحضور</th>
                                 <th>النقاط</th>
                             </tr>
@@ -160,9 +160,9 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                             ${circleData.students.map(student => `
                                 <tr>
                                     <td>${student.studentName}</td>
-                                    <td>${student.memorizationPages.formatted}</td>
-                                    <td>${student.reviewPages.formatted}</td>
-                                    <td>${student.consolidationPages.formatted}</td>
+                                    <td>${(student.memorizationPages.index * 100).toFixed(0)}%</td>
+                                    <td>${(student.reviewPages.index * 100).toFixed(0)}%</td>
+                                    <td>${(student.consolidationPages.index * 100).toFixed(0)}%</td>
                                     <td>${(student.attendance * 100).toFixed(0)}%</td>
                                     <td>${student.totalPoints}</td>
                                 </tr>

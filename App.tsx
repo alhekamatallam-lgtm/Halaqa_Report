@@ -572,7 +572,7 @@ const App: React.FC = () => {
     const titles = {
         students: 'لوحة متابعة الطلاب',
         circles: 'التقرير الإجمالي للحلقات',
-        general: 'التقرير العام والشامل',
+        general: 'نظام متابعة اداء الحلقات',
         dashboard: 'لوحة متابعة الحلقات',
         notes: 'ملاحظات الطلاب',
         evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
@@ -623,6 +623,10 @@ const App: React.FC = () => {
         }
     };
 
+    const mainContainerClass = currentPage === 'teacherAttendance' 
+        ? "py-8 px-2 sm:px-4" // Full-width for attendance page
+        : "max-w-7xl mx-auto py-8 sm:px-6 lg:px-8"; // Default centered layout
+
     return (
         <div className="bg-stone-100 min-h-screen font-sans">
             <Notification notification={notification} onClose={() => setNotification(null)} />
@@ -637,7 +641,7 @@ const App: React.FC = () => {
                 </div>
                 <Nav currentPage={currentPage} onNavigate={handleNavigation} />
             </header>
-            <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+            <main className={mainContainerClass}>
                 <div className="animate-slide-in">
                   {renderPage()}
                 </div>

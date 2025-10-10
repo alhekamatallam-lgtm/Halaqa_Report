@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { TeacherDailyAttendance, TeacherInfo } from '../types';
+import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
 
 interface TeacherAttendancePageProps {
   allTeachers: TeacherInfo[];
@@ -11,6 +12,31 @@ interface TeacherAttendancePageProps {
 
 const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher }) => {
     
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    const handleFullscreenChange = () => {
+        setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    useEffect(() => {
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    };
+
     const statusMap: Map<string, TeacherDailyAttendance> = new Map(attendanceStatus.map(s => [s.teacherName, s]));
 
     const today = new Date();
@@ -31,10 +57,19 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
 
     return (
         <div className="relative bg-white p-4 sm:p-6 rounded-xl shadow-xl border border-stone-200">
-            <div className="text-center mb-6 pb-4 border-b border-stone-200">
+            <div className="relative text-center mb-6 pb-4 border-b border-stone-200">
                 <h2 className="text-xl font-bold text-stone-700">تحضير يوم: {formattedDate}</h2>
+                <div className="absolute top-1/2 -translate-y-1/2 left-0">
+                    <button
+                        onClick={toggleFullscreen}
+                        className="p-2 rounded-full text-stone-600 hover:bg-stone-200 hover:text-stone-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        aria-label={isFullscreen ? 'الخروج من وضع ملء الشاشة' : 'الدخول في وضع ملء الشاشة'}
+                    >
+                        {isFullscreen ? <ExitFullscreenIcon className="w-6 h-6" /> : <EnterFullscreenIcon className="w-6 h-6" />}
+                    </button>
+                </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
                 {allTeachers.map(teacher => {
                     const teacherName = teacher.name;
                     const statusInfo = statusMap.get(teacherName);
