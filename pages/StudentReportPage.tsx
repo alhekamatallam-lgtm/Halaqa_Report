@@ -285,12 +285,15 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         const getProgressBarHtml = (value: number) => {
             const numericValue = Number(value);
             const finalValue = isNaN(numericValue) ? 0 : numericValue;
-            const percentage = Math.min(Math.max(finalValue * 100, 0), 100);
+
+            const actualPercentage = Math.max(finalValue * 100, 0);
+            const barPercentage = Math.min(actualPercentage, 100);
+
             return `
                 <div class="print-progress-container">
-                    <div class="print-progress-bar" style="width: ${percentage.toFixed(0)}%;"></div>
+                    <div class="print-progress-bar" style="width: ${barPercentage.toFixed(0)}%;"></div>
                 </div>
-                <div class="print-progress-percentage">${percentage.toFixed(0)}%</div>
+                <div class="print-progress-percentage">${actualPercentage.toFixed(0)}%</div>
             `;
         };
 
