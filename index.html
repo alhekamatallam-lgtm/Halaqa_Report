@@ -42,6 +42,10 @@
       
       /* Print Styles */
       @media print {
+        @page {
+          size: landscape;
+          margin: 1cm;
+        }
         /* --- GENERAL PRINT SETUP --- */
         body {
           background-image: none !important;
@@ -127,6 +131,13 @@
         .print-achievement-text {
             font-size: 9pt;
             font-weight: bold;
+        }
+        .print-progress-percentage {
+            font-size: 8pt;
+            text-align: center;
+            margin-top: 2px;
+            font-weight: bold;
+            color: #333 !important;
         }
 
         /* --- DEFAULT REPORT PRINT (Teacher Attendance, etc.) --- */

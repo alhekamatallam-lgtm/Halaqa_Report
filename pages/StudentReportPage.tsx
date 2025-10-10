@@ -288,6 +288,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                 <div class="print-progress-container">
                     <div class="print-progress-bar" style="width: ${percentage.toFixed(0)}%;"></div>
                 </div>
+                <div class="print-progress-percentage">${percentage.toFixed(0)}%</div>
             `;
         };
 
@@ -331,7 +332,6 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                                         ${getProgressBarHtml(student.consolidationPages.index)}
                                     </td>
                                     <td>
-                                        <div class="print-achievement-text">${(student.attendance * 100).toFixed(0)}%</div>
                                         ${getProgressBarHtml(student.attendance)}
                                     </td>
                                     <td>${student.totalPoints}</td>
