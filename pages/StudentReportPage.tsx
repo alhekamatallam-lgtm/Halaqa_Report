@@ -283,7 +283,9 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         }, {} as Record<string, { teacherName: string; students: ProcessedStudentData[] }>);
 
         const getProgressBarHtml = (value: number) => {
-            const percentage = Math.min(Math.max(value * 100, 0), 100);
+            const numericValue = Number(value);
+            const finalValue = isNaN(numericValue) ? 0 : numericValue;
+            const percentage = Math.min(Math.max(finalValue * 100, 0), 100);
             return `
                 <div class="print-progress-container">
                     <div class="print-progress-bar" style="width: ${percentage.toFixed(0)}%;"></div>
@@ -299,13 +301,17 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
             const weekText = selectedWeek ? `الأسبوع: ${selectedWeek}` : 'العرض المجمع لجميع الأسابيع';
             printContent += `
                 <div class="page-break">
-                    <div class="print-header">
-                        <h1>تقرير حلقة: ${circleName}</h1>
-                        <h2>المعلم: ${circleData.teacherName}</h2>
-                        <p>${weekText}</p>
-                    </div>
                     <table class="print-table">
-                        <thead>
+                         <thead>
+                            <tr>
+                                <th colspan="6" class="print-header-container">
+                                    <div class="print-header">
+                                        <h1>تقرير حلقة: ${circleName}</h1>
+                                        <h2>المعلم: ${circleData.teacherName}</h2>
+                                        <p>${weekText}</p>
+                                    </div>
+                                </th>
+                            </tr>
                             <tr>
                                 <th>اسم الطالب</th>
                                 <th>إنجاز الحفظ</th>
@@ -338,6 +344,13 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                                 </tr>
                             `).join('')}
                         </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="6" class="print-page-footer">
+                                    <span>${circleName}</span> - <span>صفحة <span class="page-number"></span></span>
+                                </td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             `;

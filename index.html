@@ -51,6 +51,7 @@
           background-image: none !important;
           background-color: white !important;
           font-size: 10pt;
+          counter-reset: pageCounter;
         }
         .print-hidden {
           display: none !important;
@@ -68,11 +69,17 @@
         }
         .page-break {
             page-break-after: always;
-            padding: 1rem;
+        }
+        .printable-student-report .page-break:last-child {
+            page-break-after: auto;
+        }
+        .print-header-container {
+          border: none !important;
+          padding: 0 0 1rem 0 !important;
         }
         .print-header {
             text-align: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0; /* Adjusted from 1.5rem */
         }
         .print-header h1 {
             font-size: 18pt;
@@ -95,9 +102,13 @@
           font-size: 9pt;
         }
         .print-table thead {
+          display: table-header-group;
           background-color: #e2e8f0 !important;
           -webkit-print-color-adjust: exact;
           color-adjust: exact;
+        }
+        .print-table tfoot {
+          display: table-footer-group;
         }
         .print-table th, .print-table td {
           border: 1px solid #9ca3af !important;
@@ -138,6 +149,17 @@
             margin-top: 2px;
             font-weight: bold;
             color: #333 !important;
+        }
+        .print-page-footer {
+          text-align: center;
+          font-size: 9pt;
+          color: #555;
+          font-weight: bold;
+          border-top: 1px solid #9ca3af !important;
+        }
+        .page-number::before {
+          counter-increment: pageCounter;
+          content: counter(pageCounter);
         }
 
         /* --- DEFAULT REPORT PRINT (Teacher Attendance, etc.) --- */
