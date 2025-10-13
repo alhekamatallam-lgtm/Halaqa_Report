@@ -22,9 +22,10 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
 
   const filteredData = React.useMemo(() => {
     return reportData.filter(item => {
-      const itemDate = new Date(item.date);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
+      // FIX: Use UTC parsing for dates to ensure cross-browser consistency
+      const itemDate = new Date(item.date + 'T00:00:00Z');
+      const start = startDate ? new Date(startDate + 'T00:00:00Z') : null;
+      const end = endDate ? new Date(endDate + 'T00:00:00Z') : null;
 
       if (start && itemDate < start) return false;
       if (end && itemDate > end) return false;
@@ -89,7 +90,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
 
     const dates = Array.from(dateSet)
         .sort((a, b) => b.localeCompare(a))
-        .map(date => new Date(date).toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' }));
+        .map(date => new Date(date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' }));
 
     setModalData({ title, dates });
   };
@@ -196,7 +197,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                     return (
                       <tr key={`${item.date}-${item.teacherName}-${index}`} className={`${rowClass} hover:bg-amber-100/60 transition-all`}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.teacherName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{new Date(item.date).toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })}</td>
                         {isAbsent ? (
                           <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
                             غائب
