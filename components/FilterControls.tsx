@@ -16,6 +16,8 @@ interface FilterControlsProps {
   searchLabel?: string;
   searchPlaceholder?: string;
   showWeekFilter?: boolean;
+  weekFilterLabel?: string;
+  weekFilterAllOptionLabel?: string;
 }
 
 const FilterControls: React.FC<FilterControlsProps> = ({
@@ -34,6 +36,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   searchLabel = 'بحث بالطالب',
   searchPlaceholder = 'ادخل اسم الطالب...',
   showWeekFilter = true,
+  weekFilterLabel = 'فلترة حسب الأسبوع',
+  weekFilterAllOptionLabel = 'كل الأسابيع',
 }) => {
   return (
     <div className="mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
@@ -106,14 +110,14 @@ const FilterControls: React.FC<FilterControlsProps> = ({
           </div>
           {showWeekFilter && (
             <div>
-              <label htmlFor="week-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة حسب الأسبوع</label>
+              <label htmlFor="week-filter" className="block text-sm font-medium text-stone-700 mb-2">{weekFilterLabel}</label>
               <select
                 id="week-filter"
                 className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
                 value={selectedWeek}
                 onChange={(e) => onFilterChange('week', e.target.value)}
               >
-                <option value="">كل الأسابيع</option>
+                <option value="">{weekFilterAllOptionLabel}</option>
                 {allWeeks.map((week) => (
                   <option key={week} value={week}>
                     {week}

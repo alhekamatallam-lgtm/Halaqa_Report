@@ -62,14 +62,46 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
       };
     }
 
+    const studentsByWeek = students.reduce((acc, student) => {
+        const week = student.week;
+        if (week) {
+            if (!acc.has(week)) {
+                acc.set(week, []);
+            }
+            acc.get(week)!.push(student);
+        }
+        return acc;
+    }, new Map<string, ProcessedStudentData[]>());
+
+    const weeklyStudentCounts: number[] = [];
+    const weeklyAvgAttendances: number[] = [];
+
+    studentsByWeek.forEach((weeklyStudents) => {
+        // Student count per week
+        const uniqueUsernames = new Set(weeklyStudents.map(s => s.username));
+        weeklyStudentCounts.push(uniqueUsernames.size);
+
+        // Attendance avg per week
+        if (weeklyStudents.length > 0) {
+            const weeklyTotalAttendance = weeklyStudents.reduce((sum, s) => sum + s.attendance, 0);
+            weeklyAvgAttendances.push(weeklyTotalAttendance / weeklyStudents.length);
+        }
+    });
+
+    const avgStudents = weeklyStudentCounts.length > 0
+        ? weeklyStudentCounts.reduce((sum, count) => sum + count, 0) / weeklyStudentCounts.length
+        : new Set(students.map(s => s.username)).size; // Fallback for data with no weeks
+    const totalStudents = Math.round(avgStudents);
+    
+    const avgAttendance = weeklyAvgAttendances.length > 0
+        ? weeklyAvgAttendances.reduce((sum, avg) => sum + avg, 0) / weeklyAvgAttendances.length
+        : (students.length > 0 ? students.reduce((sum, s) => sum + s.attendance, 0) / students.length : 0); // Fallback
+
     const totalCircles = new Set(students.map(s => s.circle)).size;
-    const totalStudents = new Set(students.map(s => s.username)).size; // Count unique students
     const totalMemorization = students.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
     const totalReview = students.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
     const totalConsolidation = students.reduce((sum, s) => sum + s.consolidationPages.achieved, 0);
     const totalAchievement = totalMemorization + totalReview + totalConsolidation;
-    // Calculate average attendance across all entries, not unique students
-    const avgAttendance = students.length > 0 ? students.reduce((sum, s) => sum + s.attendance, 0) / students.length : 0;
 
     return {
       totalCircles, totalStudents, totalMemorization, totalReview,
@@ -80,7 +112,7 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
       <StatCard icon={<CircleIcon />} label="عدد الحلقات" value={stats.totalCircles} />
-      <StatCard icon={<StudentIcon />} label="عدد الطلاب" value={stats.totalStudents} description="العدد الفعلي للطلاب بدون تكرار" />
+      <StatCard icon={<StudentIcon />} label="عدد الطلاب" value={stats.totalStudents} description="متوسط عدد الطلاب الفريدين أسبوعيًا" />
       <StatCard icon={<AttendanceIcon />} label="متوسط نسبة الحضور" value={`${(stats.avgAttendance * 100).toFixed(1)}%`} />
       
       <StatCard icon={<BookIcon />} label="إجمالي أوجه الحفظ" value={stats.totalMemorization.toFixed(1)} />

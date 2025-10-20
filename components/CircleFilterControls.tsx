@@ -12,6 +12,8 @@ interface CircleFilterControlsProps {
   onFilterChange: (filterType: 'time' | 'teacher' | 'week', value: string) => void;
   onClearFilters: () => void;
   showWeekFilter?: boolean;
+  weekFilterLabel?: string;
+  weekFilterAllOptionLabel?: string;
 }
 
 const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
@@ -26,6 +28,8 @@ const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
   onFilterChange,
   onClearFilters,
   showWeekFilter = true,
+  weekFilterLabel = 'فلترة حسب الأسبوع',
+  weekFilterAllOptionLabel = 'كل الأسابيع',
 }) => {
   const gridColsClass = showWeekFilter ? 'md:grid-cols-5' : 'md:grid-cols-4';
 
@@ -84,14 +88,14 @@ const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
           </div>
            {showWeekFilter && (
             <div>
-              <label htmlFor="week-circle-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة حسب الأسبوع</label>
+              <label htmlFor="week-circle-filter" className="block text-sm font-medium text-stone-700 mb-2">{weekFilterLabel}</label>
               <select
                 id="week-circle-filter"
                 className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
                 value={selectedWeek}
                 onChange={(e) => onFilterChange('week', e.target.value)}
               >
-                <option value="">كل الأسابيع</option>
+                <option value="">{weekFilterAllOptionLabel}</option>
                 {allWeeks.map((week) => (
                   <option key={week} value={week}>
                     {week}

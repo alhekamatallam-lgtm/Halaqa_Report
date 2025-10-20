@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -8,6 +9,8 @@ import EvaluationPage from './pages/EvaluationPage';
 import ExcellencePage from './pages/ExcellencePage';
 import TeacherAttendancePage from './pages/TeacherAttendancePage';
 import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
+import DailyStudentReportPage from './pages/DailyStudentReportPage';
+import DailyCircleReportPage from './pages/DailyCircleReportPage';
 import PasswordModal from './components/PasswordModal';
 import { Nav } from './components/Nav';
 import Notification from './components/Notification';
@@ -356,12 +359,67 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
     return Array.from(studentWeekMap.values());
 };
 
+const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
+    const normalize = (val: any): string => {
+        const str = String(val || '');
+        return str
+            .normalize('NFC')
+            .replace(/[\u200B-\u200D\uFEFF]/g, '')
+            .trim()
+            .replace(/\s+/g, ' ');
+    };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport';
+    return data.map((item): ProcessedStudentData | null => {
+        const studentName = normalize(item["الطالب"]);
+        const username = item["اسم المستخدم"];
+        if (!studentName || !username) return null;
+        
+        const circle = normalize(item["الحلقة"]);
+        const isTabyan = circle.includes('التبيان');
+
+        const memPages = parseAchievement(item["أوجه الحفظ"]);
+        const revPages = parseAchievement(item["أوجه المراجه"]);
+        const conPages = parseAchievement(item["أوجه التثبيت"]);
+
+        const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
+        const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
+        const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
+        
+        finalMemPages.formatted = `${finalMemPages.achieved.toFixed(1)} / ${finalMemPages.required.toFixed(1)}`;
+        finalMemPages.index = finalMemPages.required > 0 ? finalMemPages.achieved / finalMemPages.required : 0;
+        
+        finalRevPages.formatted = `${finalRevPages.achieved.toFixed(1)} / ${finalRevPages.required.toFixed(1)}`;
+        finalRevPages.index = finalRevPages.required > 0 ? finalRevPages.achieved / finalRevPages.required : 0;
+        
+        finalConPages.formatted = `${finalConPages.achieved.toFixed(1)} / ${finalConPages.required.toFixed(1)}`;
+        finalConPages.index = finalConPages.required > 0 ? finalConPages.achieved / finalConPages.required : 0;
+
+        return {
+            studentName,
+            username,
+            circle,
+            circleTime: normalize(item["وقت الحلقة"]),
+            memorizationLessons: normalize(item["دروس الحفظ"]),
+            memorizationPages: finalMemPages,
+            reviewLessons: normalize(item["دروس المراجعة"]),
+            reviewPages: finalRevPages,
+            consolidationPages: finalConPages,
+            teacherName: normalize(item["اسم المعلم"]),
+            program: normalize(item["البرنامج"]),
+            attendance: parsePercentage(item["نسبة الحضور"]),
+            totalPoints: item["اجمالي النقاط"] || 0,
+            guardianMobile: normalize(item["جوال ولي الأمر"]),
+            day: normalize(item["اليوم"]),
+        };
+    }).filter((item): item is ProcessedStudentData => item !== null);
+};
+
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
+    const [dailyStudents, setDailyStudents] = useState<ProcessedStudentData[]>([]);
     const [evaluationData, setEvaluationData] = useState<CircleEvaluationData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
@@ -414,7 +472,7 @@ const App: React.FC = () => {
                 
                 const dataContainer = allDataJson.data || allDataJson;
                 
-                const studentSheetName = Object.keys(dataContainer).find(name => name !== 'Evaluation_Sheet' && name !== 'supervisor' && name !== 'attandance');
+                const studentSheetName = Object.keys(dataContainer).find(name => name !== 'Evaluation_Sheet' && name !== 'supervisor' && name !== 'attandance' && name !== 'daily');
                 let allStudentsRaw: any[] = [];
                 if (studentSheetName && Array.isArray(dataContainer[studentSheetName])) {
                     allStudentsRaw = dataContainer[studentSheetName];
@@ -433,6 +491,13 @@ const App: React.FC = () => {
                 
                 const processedStudents = processData(sanitizedStudentsRaw as RawStudentData[]);
                 setStudents(processedStudents);
+
+                const dailySheetData = dataContainer['daily'];
+                if (dailySheetData && Array.isArray(dailySheetData)) {
+// FIX: The type predicate `item is ProcessedStudentData` was causing a TypeScript error because the inferred type of `item` from the `map` function was not assignable to `ProcessedStudentData` due to the optional `day` property. Explicitly typing the return of the map callback resolves this.
+                    const processedDailyStudents = processDailyData(dailySheetData as RawStudentData[]);
+                    setDailyStudents(processedDailyStudents);
+                }
                 
                 const evaluationSheetData = dataContainer['Evaluation_Sheet'];
                 if (evaluationSheetData && Array.isArray(evaluationSheetData)) {
@@ -621,6 +686,8 @@ const App: React.FC = () => {
         excellence: 'منصة تميز الحلقات',
         teacherAttendance: 'حضور وانصراف المعلمين',
         teacherAttendanceReport: 'تقرير حضور المعلمين',
+        dailyStudents: 'التقرير اليومي للطلاب',
+        dailyCircles: 'التقرير اليومي للحلقات',
     };
 
     const renderPage = () => {
@@ -663,6 +730,10 @@ const App: React.FC = () => {
                 );
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+            case 'dailyStudents':
+                return <DailyStudentReportPage students={dailyStudents} />;
+            case 'dailyCircles':
+                return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
             default:
                 return <StudentReportPage students={students} initialFilter={null} clearInitialFilter={() => {}} />;
         }

@@ -74,15 +74,9 @@ export const ReportTable: React.FC<ReportTableProps> = ({ students, onRowClick, 
             </th>
             <SortableHeader label="الحلقة" sortKey="circle" sortConfig={sortConfig} onSort={onSort} className="hidden md:table-cell" />
             <SortableHeader label="المعلم" sortKey="teacherName" sortConfig={sortConfig} onSort={onSort} className="hidden md:table-cell" />
-            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
-              إنجاز الحفظ
-            </th>
-            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
-              إنجاز المراجعة
-            </th>
-            <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">
-              إنجاز التثبيت
-            </th>
+            <SortableHeader label="إنجاز الحفظ" sortKey="memorizationPages" sortConfig={sortConfig} onSort={onSort} />
+            <SortableHeader label="إنجاز المراجعة" sortKey="reviewPages" sortConfig={sortConfig} onSort={onSort} />
+            <SortableHeader label="إنجاز التثبيت" sortKey="consolidationPages" sortConfig={sortConfig} onSort={onSort} />
             <SortableHeader label="الحضور" sortKey="attendance" sortConfig={sortConfig} onSort={onSort} />
             <SortableHeader label="النقاط" sortKey="totalPoints" sortConfig={sortConfig} onSort={onSort} className="hidden md:table-cell" />
           </tr>

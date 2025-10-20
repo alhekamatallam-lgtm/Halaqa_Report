@@ -15,6 +15,7 @@ export interface RawStudentData {
   "جوال ولي الأمر": string;
   "الأسبوع"?: string;
   "الاسبوع"?: string;
+  "اليوم"?: string;
 }
 
 export interface Achievement {
@@ -40,6 +41,7 @@ export interface ProcessedStudentData {
   totalPoints: number;
   guardianMobile: string;
   week?: string;
+  day?: string;
   hasMultipleEntries?: boolean;
 }
 

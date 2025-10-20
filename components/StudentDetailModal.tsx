@@ -18,11 +18,11 @@ const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
 const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose }) => {
   return (
     <div
-      className="fixed inset-0 bg-stone-900 bg-opacity-70 z-50 flex justify-center items-center p-4"
+      className="fixed inset-0 bg-stone-900 bg-opacity-70 z-50 flex justify-center items-start p-4 pt-16"
       onClick={onClose}
     >
       <div
-        className="bg-stone-50 rounded-2xl shadow-2xl w-full max-w-lg mx-auto transform transition-all"
+        className="bg-stone-50 rounded-2xl shadow-2xl w-full max-w-lg mx-auto transform transition-all animate-slide-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-stone-200 flex justify-between items-center">
