@@ -9,9 +9,11 @@ type SortKey = keyof ProcessedStudentData;
 
 interface DailyStudentReportPageProps {
   students: ProcessedStudentData[];
+  initialFilter: { circle: string } | null;
+  clearInitialFilter: () => void;
 }
 
-const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ students }) => {
+const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ students, initialFilter, clearInitialFilter }) => {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'totalPoints', direction: 'descending' });
     const [selectedStudent, setSelectedStudent] = useState<ProcessedStudentData | null>(null);
     
@@ -21,6 +23,19 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
     const [selectedTeacher, setSelectedTeacher] = useState<string>('');
     const [selectedCircle, setSelectedCircle] = useState<string>('');
     const [selectedDay, setSelectedDay] = useState<string>('');
+
+    useEffect(() => {
+        if (initialFilter?.circle) {
+            setSelectedCircle(initialFilter.circle);
+            // Auto-select teacher and time for the selected circle
+            const studentForCircle = students.find(s => s.circle === initialFilter.circle);
+            if (studentForCircle) {
+                setSelectedTeacher(studentForCircle.teacherName);
+                setSelectedCircleTime(studentForCircle.circleTime);
+            }
+            clearInitialFilter();
+        }
+    }, [initialFilter, clearInitialFilter, students]);
 
     const dayOptions = useMemo(() => {
         const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));

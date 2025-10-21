@@ -4,6 +4,7 @@ import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
 import GeneralReportPage from './pages/GeneralReportPage';
 import DashboardPage from './pages/DashboardPage';
+import DailyDashboardPage from './pages/DailyDashboardPage';
 import NotesPage from './pages/NotesPage';
 import EvaluationPage from './pages/EvaluationPage';
 import ExcellencePage from './pages/ExcellencePage';
@@ -414,7 +415,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
     }).filter((item): item is ProcessedStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -430,6 +431,7 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState<Page>('general');
     const [initialStudentFilter, setInitialStudentFilter] = useState<{ circle: string } | null>(null);
+    const [initialDailyStudentFilter, setInitialDailyStudentFilter] = useState<{ circle: string } | null>(null);
     const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -663,6 +665,11 @@ const App: React.FC = () => {
         setInitialStudentFilter({ circle: circleName });
         setCurrentPage('students');
     };
+
+    const handleDailyCircleSelect = (circleName: string) => {
+        setInitialDailyStudentFilter({ circle: circleName });
+        setCurrentPage('dailyStudents');
+    };
     
     if (isLoading) {
         return (
@@ -681,6 +688,7 @@ const App: React.FC = () => {
         circles: 'التقرير الإجمالي للحلقات',
         general: 'نظام متابعة اداء الحلقات',
         dashboard: 'لوحة متابعة الحلقات',
+        dailyDashboard: 'متابعة الحلقات اليومية',
         notes: 'ملاحظات الطلاب',
         evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
         excellence: 'منصة تميز الحلقات',
@@ -701,6 +709,8 @@ const App: React.FC = () => {
             case 'dashboard':
 // FIX: Pass supervisors prop to DashboardPage
                 return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
+            case 'dailyDashboard':
+                return <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
             case 'notes':
                 return <NotesPage students={students} />;
             case 'excellence':
@@ -731,7 +741,7 @@ const App: React.FC = () => {
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
             case 'dailyStudents':
-                return <DailyStudentReportPage students={dailyStudents} />;
+                return <DailyStudentReportPage students={dailyStudents} initialFilter={initialDailyStudentFilter} clearInitialFilter={() => setInitialDailyStudentFilter(null)} />;
             case 'dailyCircles':
                 return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
             default:

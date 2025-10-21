@@ -1,6 +1,6 @@
 import React from 'react';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard';
 
 interface NavProps {
   currentPage: Page;
@@ -37,6 +37,11 @@ export const Nav: React.FC<NavProps> = ({ currentPage, onNavigate }) => {
           label="متابعة الحلقات"
           isActive={currentPage === 'dashboard'}
           onClick={() => onNavigate('dashboard')}
+        />
+        <NavButton
+          label="متابعة الحلقات (يومي)"
+          isActive={currentPage === 'dailyDashboard'}
+          onClick={() => onNavigate('dailyDashboard')}
         />
          <NavButton
           label="تميز الحلقات"
