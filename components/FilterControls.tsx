@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface FilterControlsProps {
@@ -40,7 +41,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   weekFilterAllOptionLabel = 'كل الأسابيع',
 }) => {
   return (
-    <div className="mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
+    <div className="sticky top-0 z-20 mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
           <div className="md:col-span-1">
             <label htmlFor="search-filter" className="block text-sm font-medium text-stone-700 mb-2">{searchLabel}</label>

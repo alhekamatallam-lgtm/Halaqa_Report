@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { CircleEvaluationData } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -19,7 +20,7 @@ const EvaluationTable: React.FC<EvaluationTableProps> = ({ evaluations }) => {
   return (
     <div className="overflow-x-auto shadow-lg rounded-xl border border-stone-200">
       <table className="min-w-full divide-y divide-stone-200">
-        <thead className="bg-stone-200">
+        <thead className="bg-stone-200 sticky top-0 z-10">
           <tr>
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">الحلقة</th>
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">انضباط الحلقة</th>

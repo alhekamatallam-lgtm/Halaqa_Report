@@ -4,8 +4,11 @@ import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
 import type { ProcessedStudentData, Achievement } from '../types';
 import { PrintIcon } from '../components/icons';
+import Pagination from '../components/Pagination';
 
 type SortKey = keyof ProcessedStudentData;
+
+const ITEMS_PER_PAGE = 10;
 
 interface StudentReportPageProps {
   students: ProcessedStudentData[];
@@ -16,6 +19,7 @@ interface StudentReportPageProps {
 const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initialFilter, clearInitialFilter }) => {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'totalPoints', direction: 'descending' });
     const [selectedStudent, setSelectedStudent] = useState<ProcessedStudentData | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
     
     // Filters state
     const [searchQuery, setSearchQuery] = useState<string>('');
@@ -36,6 +40,11 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
             clearInitialFilter();
         }
     }, [initialFilter, clearInitialFilter, students]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedCircleTime, selectedTeacher, selectedCircle, selectedWeek]);
+
 
     // Base student data, filtered by week first. This is the source for other filter options.
     const studentsForFiltering = useMemo(() => {
@@ -125,7 +134,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         setSelectedWeek('');
     };
 
-    const { filteredAndSortedStudents, reportTitle, summary } = useMemo(() => {
+    const { filteredStudents, totalPages, reportTitle, summary } = useMemo(() => {
         // Step 1: Prepare the base data (either aggregated or for a specific week)
         let dataToFilter: ProcessedStudentData[];
         let title: string;
@@ -253,7 +262,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
             });
         }
         
-        // Step 4: Calculate summary
+        // Step 4: Calculate summary on the full filtered list before pagination
         const summary = {
             totalMemorizationAchieved: sortedList.reduce((acc, s) => acc + s.memorizationPages.achieved, 0),
             totalMemorizationRequired: sortedList.reduce((acc, s) => acc + s.memorizationPages.required, 0),
@@ -265,11 +274,18 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
             totalPoints: sortedList.reduce((acc, s) => acc + s.totalPoints, 0),
         };
 
-        return { filteredAndSortedStudents: sortedList, reportTitle: title, summary };
-    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek]);
+        // Step 5: Paginate the sorted list
+        const totalPages = Math.ceil(sortedList.length / ITEMS_PER_PAGE);
+        const paginatedList = sortedList.slice(
+            (currentPage - 1) * ITEMS_PER_PAGE,
+            currentPage * ITEMS_PER_PAGE
+        );
+
+        return { filteredStudents: paginatedList, totalPages, reportTitle: title, summary };
+    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek, currentPage]);
     
     const handlePrint = () => {
-        const studentsToPrint = filteredAndSortedStudents.filter(s => s.circleTime === 'العصر');
+        const studentsToPrint = filteredStudents.filter(s => s.circleTime === 'العصر');
 
         const circles = studentsToPrint.reduce((acc, student) => {
             if (!acc[student.circle]) {
@@ -408,11 +424,16 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
                 <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
             </div>
             <ReportTable
-                students={filteredAndSortedStudents}
+                students={filteredStudents}
                 onRowClick={setSelectedStudent}
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 summary={summary}
+            />
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
             />
             {selectedStudent && (
                 <StudentDetailModal

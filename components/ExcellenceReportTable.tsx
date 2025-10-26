@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { ExcellenceReportData } from '../types';
 import { ProgressBar } from './ProgressBar';

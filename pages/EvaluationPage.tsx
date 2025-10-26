@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react';
 import type { EvaluationSubmissionData, CircleEvaluationData, ProcessedStudentData } from '../types';
 import EvaluationModal from '../components/EvaluationModal';
 import EvaluationTable from '../components/EvaluationTable';
+import Pagination from '../components/Pagination';
 
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
+const ITEMS_PER_PAGE = 10;
 
 interface EvaluationPageProps {
   onSubmit: (data: EvaluationSubmissionData) => Promise<void>;
@@ -15,6 +17,7 @@ interface EvaluationPageProps {
 
 const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting, evaluationData, students, authenticatedUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSubmit = async (data: EvaluationSubmissionData) => {
     await onSubmit(data);
@@ -37,6 +40,16 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
     return students.filter(s => supervisorCircles.has(s.circle));
   }, [students, authenticatedUser]);
 
+  const { paginatedEvaluations, totalPages } = useMemo(() => {
+    const total = Math.ceil(visibleEvaluations.length / ITEMS_PER_PAGE);
+    const paginated = visibleEvaluations.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+    );
+    return { paginatedEvaluations: paginated, totalPages: total };
+  }, [visibleEvaluations, currentPage]);
+
+
   return (
     <>
       <div className="flex justify-end mb-4">
@@ -48,7 +61,12 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
         </button>
       </div>
       
-      <EvaluationTable evaluations={visibleEvaluations} />
+      <EvaluationTable evaluations={paginatedEvaluations} />
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+       />
 
       {isModalOpen && (
         <EvaluationModal

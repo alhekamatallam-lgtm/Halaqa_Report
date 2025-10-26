@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import type { TeacherAttendanceReportEntry, TeacherAttendanceSummaryEntry } from '../types';
+import type { SupervisorAttendanceReportEntry, SupervisorAttendanceSummaryEntry } from '../types';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import { PrintIcon } from '../components/icons';
 import { ProgressBar } from '../components/ProgressBar';
@@ -9,25 +9,25 @@ import Pagination from '../components/Pagination';
 
 const ITEMS_PER_PAGE = 10;
 
-interface TeacherAttendanceReportPageProps {
-  reportData: TeacherAttendanceReportEntry[];
+interface SupervisorAttendanceReportPageProps {
+  reportData: SupervisorAttendanceReportEntry[];
 }
 
-const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = ({ reportData }) => {
+const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPageProps> = ({ reportData }) => {
   const [activeTab, setActiveTab] = React.useState<'detailed' | 'summary'>('detailed');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
-  const [selectedTeacher, setSelectedTeacher] = React.useState('');
+  const [selectedSupervisor, setSelectedSupervisor] = React.useState('');
   const [modalData, setModalData] = React.useState<{ title: string; dates: string[] } | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, selectedTeacher, activeTab]);
+  }, [startDate, endDate, selectedSupervisor, activeTab]);
 
-  const teachers = React.useMemo(() => {
-    const teacherSet = new Set<string>(reportData.map(r => r.teacherName));
-    return Array.from<string>(teacherSet).sort((a, b) => a.localeCompare(b, 'ar'));
+  const supervisors = React.useMemo(() => {
+    const supervisorSet = new Set<string>(reportData.map(r => r.supervisorName));
+    return Array.from<string>(supervisorSet).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [reportData]);
 
   const filteredData = React.useMemo(() => {
@@ -38,44 +38,44 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
 
       if (start && itemDate < start) return false;
       if (end && itemDate > end) return false;
-      if (selectedTeacher && item.teacherName !== selectedTeacher) return false;
+      if (selectedSupervisor && item.supervisorName !== selectedSupervisor) return false;
       
       return true;
     });
-  }, [reportData, startDate, endDate, selectedTeacher]);
+  }, [reportData, startDate, endDate, selectedSupervisor]);
 
-  const summaryData: TeacherAttendanceSummaryEntry[] = React.useMemo(() => {
+  const summaryData: SupervisorAttendanceSummaryEntry[] = React.useMemo(() => {
     const summaryMap = new Map<string, { presentDates: Set<string>; absentDates: Set<string> }>();
 
     filteredData.forEach(item => {
-        if (!summaryMap.has(item.teacherName)) {
-            summaryMap.set(item.teacherName, { presentDates: new Set(), absentDates: new Set() });
+        if (!summaryMap.has(item.supervisorName)) {
+            summaryMap.set(item.supervisorName, { presentDates: new Set(), absentDates: new Set() });
         }
-        const teacherSummary = summaryMap.get(item.teacherName)!;
-        const isAbsent = item.checkInTime === null && item.checkOutTime === null;
+        const supervisorSummary = summaryMap.get(item.supervisorName)!;
+        const isAbsent = item.checkInTime === null;
 
         if (isAbsent) {
-            teacherSummary.absentDates.add(item.date);
+            supervisorSummary.absentDates.add(item.date);
         } else {
-            teacherSummary.presentDates.add(item.date);
+            supervisorSummary.presentDates.add(item.date);
         }
     });
 
     return Array.from(summaryMap.entries())
-        .map(([teacherName, data]) => {
+        .map(([supervisorName, data]) => {
             const presentDays = data.presentDates.size;
             const absentDays = data.absentDates.size;
             const totalDays = presentDays + absentDays;
             return {
-                teacherName,
+                supervisorName,
                 presentDays,
                 absentDays,
                 attendanceRate: totalDays > 0 ? presentDays / totalDays : 0,
             };
         })
-        .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ar'));
+        .sort((a, b) => a.supervisorName.localeCompare(b.supervisorName, 'ar'));
   }, [filteredData]);
-
+  
   const paginatedDetailedData = React.useMemo(() => {
     return filteredData.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
@@ -92,22 +92,23 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
   }, [summaryData, currentPage]);
   const totalSummaryPages = Math.ceil(summaryData.length / ITEMS_PER_PAGE);
 
+
   const handleClearFilters = () => {
     setStartDate('');
     setEndDate('');
-    setSelectedTeacher('');
+    setSelectedSupervisor('');
   };
   
-  const handleShowDates = (teacherName: string, type: 'present' | 'absent') => {
+  const handleShowDates = (supervisorName: string, type: 'present' | 'absent') => {
     const title = type === 'present' 
-        ? `أيام الحضور للمعلم: ${teacherName}` 
-        : `أيام الغياب للمعلم: ${teacherName}`;
+        ? `أيام الحضور للمشرف: ${supervisorName}` 
+        : `أيام الغياب للمشرف: ${supervisorName}`;
     
     const dateSet = new Set<string>();
     filteredData
-        .filter(item => item.teacherName === teacherName)
+        .filter(item => item.supervisorName === supervisorName)
         .forEach(item => {
-            const isAbsent = item.checkInTime === null && item.checkOutTime === null;
+            const isAbsent = item.checkInTime === null;
             if ((type === 'present' && !isAbsent) || (type === 'absent' && isAbsent)) {
                 dateSet.add(item.date);
             }
@@ -135,7 +136,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
     </button>
   );
 
-  const printTitle = `تقرير حضور المعلمين - ${new Date().toLocaleDateString('ar-EG')}`;
+  const printTitle = `تقرير حضور المشرفين - ${new Date().toLocaleDateString('ar-EG')}`;
 
   return (
     <div className="space-y-6">
@@ -162,16 +163,16 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
             />
           </div>
           <div>
-            <label htmlFor="teacher-filter" className="block text-sm font-medium text-stone-700 mb-2">المعلم</label>
+            <label htmlFor="supervisor-filter" className="block text-sm font-medium text-stone-700 mb-2">المشرف</label>
             <select
-              id="teacher-filter"
-              value={selectedTeacher}
-              onChange={e => setSelectedTeacher(e.target.value)}
+              id="supervisor-filter"
+              value={selectedSupervisor}
+              onChange={e => setSelectedSupervisor(e.target.value)}
               className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
             >
-              <option value="">كل المعلمين</option>
-              {teachers.map(teacher => (
-                <option key={teacher} value={teacher}>{teacher}</option>
+              <option value="">كل المشرفين</option>
+              {supervisors.map(supervisor => (
+                <option key={supervisor} value={supervisor}>{supervisor}</option>
               ))}
             </select>
           </div>
@@ -208,38 +209,34 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
               <table className="min-w-full divide-y divide-stone-200">
                 <thead className="bg-stone-100 sticky top-[49px] z-5">
                   <tr>
-                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">اسم المعلم</th>
+                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">اسم المشرف</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">التاريخ</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">وقت الحضور</th>
-                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">وقت الانصراف</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
                   {paginatedDetailedData.length > 0 ? (
                     paginatedDetailedData.map((item, index) => {
-                      const isAbsent = item.checkInTime === null && item.checkOutTime === null;
+                      const isAbsent = item.checkInTime === null;
                       const rowClass = isAbsent ? 'bg-red-50/70 absent-row-print' : (index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70');
 
                       return (
-                        <tr key={`${item.date}-${item.teacherName}-${index}`} className={`${rowClass} hover:bg-amber-100/60 transition-all`}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.teacherName}</td>
+                        <tr key={`${item.date}-${item.supervisorName}-${index}`} className={`${rowClass} hover:bg-amber-100/60 transition-all`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.supervisorName}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })}</td>
                           {isAbsent ? (
-                            <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
                               غائب
                             </td>
                           ) : (
-                            <>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkInTime || '---'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkOutTime || '---'}</td>
-                            </>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkInTime || '---'}</td>
                           )}
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
+                      <td colSpan={3} className="px-6 py-12 text-center text-stone-500">
                         لا توجد بيانات تطابق الفلتر المحدد.
                       </td>
                     </tr>
@@ -247,19 +244,19 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                 </tbody>
               </table>
             </div>
-            <div className="p-4">
+             <div className="p-4">
               <Pagination currentPage={currentPage} totalPages={totalDetailedPages} onPageChange={setCurrentPage} />
             </div>
           </div>
         )}
 
         {activeTab === 'summary' && (
-          <div>
+           <div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-stone-200">
                 <thead className="bg-stone-100 sticky top-[49px] z-5">
                   <tr>
-                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">اسم المعلم</th>
+                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">اسم المشرف</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">عدد أيام الحضور</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">عدد أيام الغياب</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">نسبة الحضور</th>
@@ -268,11 +265,11 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                 <tbody className="bg-white divide-y divide-stone-200">
                   {paginatedSummaryData.length > 0 ? (
                     paginatedSummaryData.map((item, index) => (
-                      <tr key={item.teacherName} className={`${index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70'} hover:bg-amber-100/60 transition-all`}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.teacherName}</td>
+                      <tr key={item.supervisorName} className={`${index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70'} hover:bg-amber-100/60 transition-all`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.supervisorName}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-center">
                           <button
-                            onClick={() => handleShowDates(item.teacherName, 'present')}
+                            onClick={() => handleShowDates(item.supervisorName, 'present')}
                             disabled={item.presentDays === 0}
                             className="text-green-700 underline cursor-pointer hover:text-green-800 disabled:text-gray-400 disabled:no-underline disabled:cursor-default"
                           >
@@ -281,7 +278,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-center">
                            <button
-                            onClick={() => handleShowDates(item.teacherName, 'absent')}
+                            onClick={() => handleShowDates(item.supervisorName, 'absent')}
                             disabled={item.absentDays === 0}
                             className="text-red-700 underline cursor-pointer hover:text-red-800 disabled:text-gray-400 disabled:no-underline disabled:cursor-default"
                           >
@@ -306,7 +303,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                 </tbody>
               </table>
             </div>
-            <div className="p-4">
+             <div className="p-4">
                <Pagination currentPage={currentPage} totalPages={totalSummaryPages} onPageChange={setCurrentPage} />
             </div>
           </div>
@@ -322,4 +319,4 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
   );
 };
 
-export default TeacherAttendanceReportPage;
+export default SupervisorAttendanceReportPage;

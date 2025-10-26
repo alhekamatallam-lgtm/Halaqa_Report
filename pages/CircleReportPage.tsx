@@ -3,6 +3,9 @@ import type { ProcessedStudentData, CircleReportData, SupervisorData } from '../
 import CircleFilterControls from '../components/CircleFilterControls';
 import { CircleReportTable } from '../components/CircleReportTable';
 import { PrintIcon } from '../components/icons';
+import Pagination from '../components/Pagination';
+
+const ITEMS_PER_PAGE = 10;
 
 interface CircleReportPageProps {
   students: ProcessedStudentData[];
@@ -14,6 +17,11 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
   const [selectedCircleTime, setSelectedCircleTime] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedWeek, setSelectedWeek] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCircleTime, selectedTeacher, selectedWeek]);
 
   const weekOptions = useMemo(() => {
     const weeks = new Set<string>(students.map(s => s.week).filter((w): w is string => !!w));
@@ -64,7 +72,7 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
     setSelectedWeek('');
   };
   
-  const { circles: filteredData, summary } = useMemo(() => {
+  const { paginatedCircles, totalPages, summary } = useMemo(() => {
     let filteredStudents = studentsForFiltering;
     if (selectedCircleTime) {
       filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
@@ -135,7 +143,6 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
         report = report.filter(circle => circle.circleName.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // Calculate Summary from the students that make up the final filtered report
     const finalCircleNames = new Set(report.map(c => c.circleName));
     const finalStudents = filteredStudents.filter(s => finalCircleNames.has(s.circle));
     
@@ -150,8 +157,14 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
         totalPoints: finalStudents.reduce((acc, s) => acc + s.totalPoints, 0),
     };
     
-    return { circles: report, summary };
-  }, [studentsForFiltering, searchQuery, selectedCircleTime, selectedTeacher, supervisors]);
+    const totalPages = Math.ceil(report.length / ITEMS_PER_PAGE);
+    const paginatedCircles = report.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
+
+    return { paginatedCircles, totalPages, summary };
+  }, [studentsForFiltering, searchQuery, selectedCircleTime, selectedTeacher, supervisors, currentPage]);
 
   const reportTitle = selectedWeek ? `عرض بيانات: ${selectedWeek}` : 'العرض المجمع لجميع الأسابيع';
 
@@ -205,7 +218,7 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
                         </tr>
                     </thead>
                     <tbody>
-                        ${filteredData.map(circle => `
+                        ${paginatedCircles.map(circle => `
                             <tr>
                                 <td>${circle.circleName}</td>
                                 <td>${circle.teacherName}</td>
@@ -286,7 +299,12 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
       <div className="mb-4">
         <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
       </div>
-      <CircleReportTable circles={filteredData} summary={summary} />
+      <CircleReportTable circles={paginatedCircles} summary={summary} />
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </>
   );
 };

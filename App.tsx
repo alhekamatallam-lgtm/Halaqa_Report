@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -10,15 +9,16 @@ import EvaluationPage from './pages/EvaluationPage';
 import ExcellencePage from './pages/ExcellencePage';
 import TeacherAttendancePage from './pages/TeacherAttendancePage';
 import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
+import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
 import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
 import PasswordModal from './components/PasswordModal';
-import { Nav } from './components/Nav';
+import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
 import { Spinner } from './components/Spinner';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry } from './types';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbx9ppbeol6DtF0g5zNRBj2uD5GmPwebFOBXDonw7eO-TIRoCM6rOMiLwIktQfiNPl11/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
 
 const parseAchievement = (value: any): Achievement => {
   const strValue = String(value || '');
@@ -165,7 +165,6 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         timeZone,
     };
     
-    // Step 1: Aggregate check-in/check-out times per teacher per day
     const dailyRecords = new Map<string, { teacherName: string; date: string; checkIn: Date | null; checkOut: Date | null }>();
 
     data.forEach(item => {
@@ -196,7 +195,6 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         }
     });
 
-    // Step 2: Determine date range and add records for absent days
     if (data.length > 0 || allTeachers.length > 0) {
         let minDate: Date | null = null;
         let maxDate: Date | null = null;
@@ -237,7 +235,6 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         }
     }
 
-    // Step 3: Format the aggregated data into the final report structure
     const report: TeacherAttendanceReportEntry[] = Array.from(dailyRecords.values()).map(record => ({
         teacherName: record.teacherName,
         date: record.date,
@@ -245,11 +242,107 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         checkOutTime: record.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkOut) : null,
     }));
 
-    // Step 4: Sort the final report
     return report.sort((a, b) => {
         if (a.date > b.date) return -1;
         if (a.date < b.date) return 1;
         return a.teacherName.localeCompare(b.teacherName, 'ar');
+    });
+};
+
+const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData[], allSupervisors: string[]): SupervisorAttendanceReportEntry[] => {
+    const timeZone = 'Asia/Riyadh';
+    
+    const toRiyadhDateString = (date: Date): string => {
+        const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(date);
+        const year = parts.find(p => p.type === 'year')?.value;
+        const month = parts.find(p => p.type === 'month')?.value;
+        const day = parts.find(p => p.type === 'day')?.value;
+        return `${year}-${month}-${day}`;
+    };
+
+    const timeFormatOptions: Intl.DateTimeFormatOptions = {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone,
+    };
+    
+    const dailyRecords = new Map<string, { supervisorName: string; date: string; checkIn: Date | null }>();
+
+    data.forEach(item => {
+        const timestamp = new Date(item.time);
+        if (isNaN(timestamp.getTime())) return;
+        
+        const supervisorName = (item.name || '').trim();
+        const status = (item.status || '').trim();
+        if (!supervisorName) return;
+
+        const dateString = toRiyadhDateString(timestamp);
+        const mapKey = `${dateString}/${supervisorName}`;
+
+        let entry = dailyRecords.get(mapKey);
+        if (!entry) {
+            entry = { supervisorName, date: dateString, checkIn: null };
+            dailyRecords.set(mapKey, entry);
+        }
+        
+        if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
+            if (!entry.checkIn || timestamp < entry.checkIn) {
+                entry.checkIn = timestamp;
+            }
+        }
+    });
+
+    if (data.length > 0 || allSupervisors.length > 0) {
+        let minDate: Date | null = null;
+        let maxDate: Date | null = null;
+
+        data.forEach(item => {
+            const timestamp = new Date(item.time);
+            if (isNaN(timestamp.getTime())) return;
+            if (!minDate || timestamp < minDate) minDate = timestamp;
+            if (!maxDate || timestamp > maxDate) maxDate = timestamp;
+        });
+
+        const today = new Date();
+        if (!maxDate || today > maxDate) {
+            maxDate = today;
+        }
+        if (minDate && maxDate) {
+            const workingDays = [0, 1, 2, 3]; // Sunday to Wednesday
+            let currentDate = new Date(minDate);
+            currentDate.setHours(0, 0, 0, 0);
+
+            while (currentDate <= maxDate) {
+                if (workingDays.includes(currentDate.getDay())) {
+                    const dateString = toRiyadhDateString(currentDate);
+                    allSupervisors.forEach(supervisorName => {
+                        const mapKey = `${dateString}/${supervisorName}`;
+                        if (!dailyRecords.has(mapKey)) {
+                            dailyRecords.set(mapKey, {
+                                supervisorName,
+                                date: dateString,
+                                checkIn: null,
+                            });
+                        }
+                    });
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        }
+    }
+
+    const report: SupervisorAttendanceReportEntry[] = Array.from(dailyRecords.values()).map(record => ({
+        supervisorName: record.supervisorName,
+        date: record.date,
+        checkInTime: record.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkIn) : null,
+    }));
+
+    return report.sort((a, b) => {
+        if (a.date > b.date) return -1;
+        if (a.date < b.date) return 1;
+        return a.supervisorName.localeCompare(b.supervisorName, 'ar');
     });
 };
 
@@ -415,7 +508,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
     }).filter((item): item is ProcessedStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -425,6 +518,7 @@ const App: React.FC = () => {
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
     const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
+    const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittingTeacher, setSubmittingTeacher] = useState<string | null>(null);
@@ -435,7 +529,6 @@ const App: React.FC = () => {
     const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
     const asrTeachersInfo = useMemo(() => {
         const teacherInfoMap = new Map<string, TeacherInfo>();
@@ -467,22 +560,19 @@ const App: React.FC = () => {
             setError(null);
             const cacheBuster = `&v=${new Date().getTime()}`;
             try {
-                // Fetch student and evaluation data
                 const allDataResponse = await fetch(`${API_URL}?${cacheBuster.substring(1)}`);
                 if (!allDataResponse.ok) throw new Error(`خطأ في الشبكة: ${allDataResponse.statusText}`);
                 const allDataJson = await allDataResponse.json();
-                
-                const dataContainer = allDataJson.data || allDataJson;
-                
-                const studentSheetName = Object.keys(dataContainer).find(name => name !== 'Evaluation_Sheet' && name !== 'supervisor' && name !== 'attandance' && name !== 'daily');
-                let allStudentsRaw: any[] = [];
-                if (studentSheetName && Array.isArray(dataContainer[studentSheetName])) {
-                    allStudentsRaw = dataContainer[studentSheetName];
-                } else {
-                     console.warn("لم يتم العثور على ورقة بيانات الطلاب.");
+
+                if (!allDataJson.success) {
+                    throw new Error("فشل في جلب البيانات من المصدر");
                 }
                 
-                const sanitizedStudentsRaw = allStudentsRaw.map(row => {
+                const dataContainer = allDataJson.data || {};
+                const supervisorAttendanceRaw = allDataJson.respon || [];
+                
+                const allStudentsRaw = dataContainer.report || [];
+                const sanitizedStudentsRaw = allStudentsRaw.map((row: any) => {
                     const newRow: { [key: string]: any } = {};
                     Object.keys(row).forEach(key => {
                         const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
@@ -490,13 +580,11 @@ const App: React.FC = () => {
                     });
                     return newRow;
                 });
-                
                 const processedStudents = processData(sanitizedStudentsRaw as RawStudentData[]);
                 setStudents(processedStudents);
 
-                const dailySheetData = dataContainer['daily'];
+                const dailySheetData = dataContainer.daily;
                 if (dailySheetData && Array.isArray(dailySheetData)) {
-// FIX: The type predicate `item is ProcessedStudentData` was causing a TypeScript error because the inferred type of `item` from the `map` function was not assignable to `ProcessedStudentData` due to the optional `day` property. Explicitly typing the return of the map callback resolves this.
                     const processedDailyStudents = processDailyData(dailySheetData as RawStudentData[]);
                     setDailyStudents(processedDailyStudents);
                 }
@@ -511,9 +599,14 @@ const App: React.FC = () => {
                 if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
                     const processedSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
                     setSupervisors(processedSupervisors);
+                    const allSupervisorNames = processedSupervisors.map(s => s.supervisorName);
+                    if (Array.isArray(supervisorAttendanceRaw)) {
+                        const processedReport = processSupervisorAttendanceReportData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], allSupervisorNames);
+                        setSupervisorAttendanceReport(processedReport);
+                    }
                 }
 
-                const attendanceRaw = dataContainer['attandance'] || [];
+                const attendanceRaw = dataContainer.attandance || [];
                 if (attendanceRaw && Array.isArray(attendanceRaw)) {
                     const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
                     const currentAsrTeacherNames = Array.from<string>(new Set(
@@ -684,18 +777,19 @@ const App: React.FC = () => {
     }
 
     const titles = {
-        students: 'لوحة متابعة الطلاب',
-        circles: 'التقرير الإجمالي للحلقات',
-        general: 'نظام متابعة اداء الحلقات',
-        dashboard: 'لوحة متابعة الحلقات',
-        dailyDashboard: 'متابعة الحلقات اليومية',
+        students: 'تقرير الطلاب',
+        circles: 'تقرير الحلقات',
+        general: 'التقرير العام',
+        dashboard: 'متابعة الحلقات',
+        dailyDashboard: 'متابعة الحلقات (يومي)',
         notes: 'ملاحظات الطلاب',
         evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
-        excellence: 'منصة تميز الحلقات',
+        excellence: 'تميز الحلقات',
         teacherAttendance: 'حضور وانصراف المعلمين',
         teacherAttendanceReport: 'تقرير حضور المعلمين',
-        dailyStudents: 'التقرير اليومي للطلاب',
-        dailyCircles: 'التقرير اليومي للحلقات',
+        supervisorAttendanceReport: 'تقرير حضور المشرفين',
+        dailyStudents: 'التقرير اليومي (طلاب)',
+        dailyCircles: 'التقرير اليومي (حلقات)',
     };
 
     const renderPage = () => {
@@ -707,14 +801,12 @@ const App: React.FC = () => {
             case 'general':
                 return <GeneralReportPage students={students} />;
             case 'dashboard':
-// FIX: Pass supervisors prop to DashboardPage
                 return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
             case 'dailyDashboard':
                 return <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
             case 'notes':
                 return <NotesPage students={students} />;
             case 'excellence':
-// FIX: Pass supervisors prop to ExcellencePage
                 return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'evaluation':
                  if (!authenticatedUser) return null;
@@ -735,45 +827,46 @@ const App: React.FC = () => {
                         onSubmit={handlePostTeacherAttendance}
                         isSubmitting={isSubmitting}
                         submittingTeacher={submittingTeacher}
-                        setHeaderVisible={setIsHeaderVisible}
                     />
                 );
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+            case 'supervisorAttendanceReport':
+                return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
             case 'dailyStudents':
                 return <DailyStudentReportPage students={dailyStudents} initialFilter={initialDailyStudentFilter} clearInitialFilter={() => setInitialDailyStudentFilter(null)} />;
             case 'dailyCircles':
                 return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
             default:
-                return <StudentReportPage students={students} initialFilter={null} clearInitialFilter={() => {}} />;
+                return <GeneralReportPage students={students} />;
         }
     };
 
-    const mainContainerClass = currentPage === 'teacherAttendance' 
-        ? "py-8 px-2 sm:px-4" // Full-width for attendance page
-        : "max-w-7xl mx-auto py-8 sm:px-6 lg:px-8"; // Default centered layout
-
     return (
-        <div className="bg-stone-100 min-h-screen font-sans">
+        <div className="flex h-screen bg-stone-100 text-stone-800 font-sans">
             <Notification notification={notification} onClose={() => setNotification(null)} />
-            {isHeaderVisible && (
-                <header className="bg-stone-800/95 backdrop-blur-sm text-white shadow-lg pb-4 sticky top-0 z-40 print-hidden">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="text-center pt-6">
-                            <h2 className="text-xl font-semibold text-stone-200">مجمع الراجحي بشبرا</h2>
+            
+            <Sidebar currentPage={currentPage} onNavigate={handleNavigation} />
+
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <header className="bg-white/80 backdrop-blur-sm shadow-md z-10 print-hidden border-b border-stone-200">
+                    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="text-center pt-5">
+                            <h2 className="text-lg font-semibold text-stone-600">مجمع الراجحي بشبرا - نظام متابعة أداء الحلقات</h2>
                         </div>
-                        <h1 className="text-4xl font-bold leading-tight text-center text-amber-400 pt-2 pb-6" style={{textShadow: '2px 2px 4px rgba(0,0,0,0.6)'}}>
-                        {titles[currentPage]}
+                        <h1 className="text-3xl font-bold leading-tight text-center text-stone-800 pt-1 pb-5">
+                            {titles[currentPage]}
                         </h1>
                     </div>
-                    <Nav currentPage={currentPage} onNavigate={handleNavigation} />
                 </header>
-            )}
-            <main className={mainContainerClass}>
-                <div className="animate-slide-in">
-                  {renderPage()}
-                </div>
-            </main>
+                
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                    <div className="animate-slide-in">
+                        {renderPage()}
+                    </div>
+                </main>
+            </div>
+
             {showPasswordModal && (
                 <PasswordModal
                     supervisors={supervisors}

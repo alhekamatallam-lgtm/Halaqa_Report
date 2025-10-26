@@ -1,3 +1,4 @@
+
 export interface RawStudentData {
   "الطالب": string;
   "اسم المستخدم": number;
@@ -148,6 +149,25 @@ export interface TeacherAttendanceReportEntry {
 
 export interface TeacherAttendanceSummaryEntry {
   teacherName: string;
+  presentDays: number;
+  absentDays: number;
+  attendanceRate: number;
+}
+
+export interface RawSupervisorAttendanceData {
+  "time": string;
+  "name": string;
+  "status": 'الحضور' | 'حضور' | string;
+}
+
+export interface SupervisorAttendanceReportEntry {
+  supervisorName: string;
+  date: string;
+  checkInTime: string | null;
+}
+
+export interface SupervisorAttendanceSummaryEntry {
+  supervisorName: string;
   presentDays: number;
   absentDays: number;
   attendanceRate: number;

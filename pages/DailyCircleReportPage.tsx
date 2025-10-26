@@ -3,6 +3,9 @@ import type { ProcessedStudentData, CircleReportData, SupervisorData } from '../
 import CircleFilterControls from '../components/CircleFilterControls';
 import { CircleReportTable } from '../components/CircleReportTable';
 import { PrintIcon } from '../components/icons';
+import Pagination from '../components/Pagination';
+
+const ITEMS_PER_PAGE = 10;
 
 interface DailyCircleReportPageProps {
   students: ProcessedStudentData[];
@@ -14,6 +17,11 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
   const [selectedCircleTime, setSelectedCircleTime] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCircleTime, selectedTeacher, selectedDay]);
 
   const dayOptions = useMemo(() => {
     const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));
@@ -64,7 +72,7 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
     setSelectedDay('');
   };
   
-  const { circles: filteredData, summary } = useMemo(() => {
+  const { paginatedCircles, totalPages, summary } = useMemo(() => {
     let filteredStudents = students;
 
     if (selectedDay) {
@@ -153,8 +161,14 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
         totalPoints: finalStudents.reduce((acc, s) => acc + s.totalPoints, 0),
     };
     
-    return { circles: report, summary };
-  }, [students, searchQuery, selectedCircleTime, selectedTeacher, supervisors, selectedDay]);
+    const totalPages = Math.ceil(report.length / ITEMS_PER_PAGE);
+    const paginatedCircles = report.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
+    
+    return { paginatedCircles, totalPages, summary };
+  }, [students, searchQuery, selectedCircleTime, selectedTeacher, supervisors, selectedDay, currentPage]);
 
   const reportTitle = `التقرير اليومي للحلقات ${selectedDay ? `- ${selectedDay}`: ''}`;
 
@@ -206,7 +220,7 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
                         </tr>
                     </thead>
                     <tbody>
-                        ${filteredData.map(circle => `
+                        ${paginatedCircles.map(circle => `
                             <tr>
                                 <td>${circle.circleName}</td>
                                 <td>${circle.teacherName}</td>
@@ -290,7 +304,12 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
       <div className="mb-4">
         <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
       </div>
-      <CircleReportTable circles={filteredData} summary={summary} />
+      <CircleReportTable circles={paginatedCircles} summary={summary} />
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </>
   );
 };

@@ -8,17 +8,15 @@ interface TeacherAttendancePageProps {
   onSubmit: (teacherName: string, action: 'حضور' | 'انصراف') => Promise<void>;
   isSubmitting: boolean;
   submittingTeacher: string | null;
-  setHeaderVisible: (visible: boolean) => void;
 }
 
-const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher, setHeaderVisible }) => {
+const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher }) => {
     
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     const handleFullscreenChange = () => {
         const isCurrentlyFullscreen = !!document.fullscreenElement;
         setIsFullscreen(isCurrentlyFullscreen);
-        setHeaderVisible(!isCurrentlyFullscreen);
     };
 
     useEffect(() => {
@@ -27,14 +25,12 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
         // Cleanup function
         return () => {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            // Ensure header is visible when component unmounts
-            setHeaderVisible(true);
             // Exit fullscreen if active when leaving the page
             if (document.fullscreenElement) {
                 document.exitFullscreen();
             }
         };
-    }, [setHeaderVisible]);
+    }, []);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {

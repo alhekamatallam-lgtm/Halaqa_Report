@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface CircleFilterControlsProps {
@@ -34,7 +35,7 @@ const CircleFilterControls: React.FC<CircleFilterControlsProps> = ({
   const gridColsClass = showWeekFilter ? 'md:grid-cols-5' : 'md:grid-cols-4';
 
   return (
-    <div className="mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
+    <div className="sticky top-0 z-20 mb-8 bg-stone-50 p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
         <div className={`grid grid-cols-1 ${gridColsClass} gap-4 items-end`}>
           <div>
             <label htmlFor="search-circle-filter" className="block text-sm font-medium text-stone-700 mb-2">بحث بالحلقة</label>

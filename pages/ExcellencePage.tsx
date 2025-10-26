@@ -1,8 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { ProcessedStudentData, ExcellenceReportData, SupervisorData } from '../types';
 import ExcellenceReportTable from '../components/ExcellenceReportTable';
 import CircleFilterControls from '../components/CircleFilterControls';
 import { CrownIcon } from '../components/icons';
+import Pagination from '../components/Pagination';
+
+const ITEMS_PER_PAGE = 10;
 
 interface ExcellencePageProps {
   students: ProcessedStudentData[];
@@ -68,6 +71,11 @@ const PodiumCard: React.FC<{ rank: number; circle: ExcellenceReportData | undefi
 
 const ExcellencePage: React.FC<ExcellencePageProps> = ({ students, supervisors }) => {
   const [selectedWeek, setSelectedWeek] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedWeek]);
   
   const asrStudents = useMemo(() => students.filter(student => student.circleTime === 'العصر'), [students]);
 
@@ -148,6 +156,16 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students, supervisors }
         }));
   }, [asrStudents, selectedWeek, supervisors]);
 
+  const { paginatedRankedData, totalPages } = useMemo(() => {
+    const total = Math.ceil(rankedData.length / ITEMS_PER_PAGE);
+    const paginated = rankedData.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+    );
+    return { paginatedRankedData: paginated, totalPages: total };
+  }, [rankedData, currentPage]);
+
+
   const handleFilterChange = (filterType: 'time' | 'teacher' | 'week', value: string) => {
     if (filterType === 'week') {
       setSelectedWeek(value);
@@ -183,7 +201,12 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students, supervisors }
           <PodiumCard rank={1} circle={first} />
           <PodiumCard rank={3} circle={third} />
       </div>
-      <ExcellenceReportTable circles={rankedData} />
+      <ExcellenceReportTable circles={paginatedRankedData} />
+      <Pagination 
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
     </div>
   );
 };

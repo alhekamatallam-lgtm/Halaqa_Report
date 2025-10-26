@@ -4,8 +4,10 @@ import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
 import type { ProcessedStudentData } from '../types';
 import { PrintIcon } from '../components/icons';
+import Pagination from '../components/Pagination';
 
 type SortKey = keyof ProcessedStudentData;
+const ITEMS_PER_PAGE = 10;
 
 interface DailyStudentReportPageProps {
   students: ProcessedStudentData[];
@@ -16,7 +18,8 @@ interface DailyStudentReportPageProps {
 const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ students, initialFilter, clearInitialFilter }) => {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'totalPoints', direction: 'descending' });
     const [selectedStudent, setSelectedStudent] = useState<ProcessedStudentData | null>(null);
-    
+    const [currentPage, setCurrentPage] = useState(1);
+
     // Filters state
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedCircleTime, setSelectedCircleTime] = useState<string>('');
@@ -27,7 +30,6 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
     useEffect(() => {
         if (initialFilter?.circle) {
             setSelectedCircle(initialFilter.circle);
-            // Auto-select teacher and time for the selected circle
             const studentForCircle = students.find(s => s.circle === initialFilter.circle);
             if (studentForCircle) {
                 setSelectedTeacher(studentForCircle.teacherName);
@@ -36,6 +38,11 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
             clearInitialFilter();
         }
     }, [initialFilter, clearInitialFilter, students]);
+
+     useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedCircleTime, selectedTeacher, selectedCircle, selectedDay]);
+
 
     const dayOptions = useMemo(() => {
         const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));
@@ -47,7 +54,6 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
         return students.filter(s => s.day === selectedDay);
     }, [students, selectedDay]);
 
-    // Memoized, interconnected lists for filters, following a strict hierarchy.
     const timeOptions = useMemo(() => {
         const times = new Set<string>(studentsForFiltering.map(s => s.circleTime).filter(item => item));
         return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
@@ -73,7 +79,6 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
         return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [studentsForFiltering, selectedCircleTime, selectedTeacher]);
 
-    // Effects to reset selections if they become invalid (safety net)
     useEffect(() => {
         if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
             setSelectedTeacher('');
@@ -95,7 +100,6 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
     const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle' | 'week', value: string) => {
         if (filterType === 'week') { // This is our day filter
             setSelectedDay(value);
-            // Reset downstream filters
             setSelectedCircleTime('');
             setSelectedTeacher('');
             setSelectedCircle('');
@@ -119,7 +123,7 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
         setSelectedDay('');
     };
 
-    const { filteredAndSortedStudents, reportTitle, summary } = useMemo(() => {
+    const { paginatedStudents, totalPages, reportTitle, summary } = useMemo(() => {
         let filteredList = students;
         const title = `التقرير اليومي للطلاب ${selectedDay ? `- ${selectedDay}`: ''}`;
 
@@ -176,11 +180,17 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
             totalPoints: sortedList.reduce((acc, s) => acc + s.totalPoints, 0),
         };
 
-        return { filteredAndSortedStudents: sortedList, reportTitle: title, summary };
-    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedDay]);
+        const totalPages = Math.ceil(sortedList.length / ITEMS_PER_PAGE);
+        const paginatedStudents = sortedList.slice(
+            (currentPage - 1) * ITEMS_PER_PAGE,
+            currentPage * ITEMS_PER_PAGE
+        );
+
+        return { paginatedStudents, totalPages, reportTitle: title, summary };
+    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedDay, currentPage]);
     
     const handlePrint = () => {
-        const studentsToPrint = filteredAndSortedStudents.filter(s => s.circleTime === 'العصر');
+        const studentsToPrint = paginatedStudents.filter(s => s.circleTime === 'العصر');
 
         const circles = studentsToPrint.reduce((acc, student) => {
             if (!acc[student.circle]) {
@@ -320,11 +330,16 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
                 <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
             </div>
             <ReportTable
-                students={filteredAndSortedStudents}
+                students={paginatedStudents}
                 onRowClick={setSelectedStudent}
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 summary={summary}
+            />
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
             />
             {selectedStudent && (
                 <StudentDetailModal

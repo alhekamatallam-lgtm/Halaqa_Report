@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { ProcessedStudentData } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -10,6 +11,7 @@ interface ReportSummary {
     totalMemorizationRequired: number;
     totalReviewAchieved: number;
     totalReviewRequired: number;
+
     totalConsolidationAchieved: number;
     totalConsolidationRequired: number;
     avgAttendance: number;

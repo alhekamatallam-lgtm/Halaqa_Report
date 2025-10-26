@@ -3,8 +3,10 @@ import { ReportTable } from '../components/ReportTable';
 import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
 import type { ProcessedStudentData, Achievement } from '../types';
+import Pagination from '../components/Pagination';
 
 type SortKey = keyof ProcessedStudentData;
+const ITEMS_PER_PAGE = 10;
 
 interface NotesPageProps {
   students: ProcessedStudentData[];
@@ -13,13 +15,18 @@ interface NotesPageProps {
 const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'totalPoints', direction: 'descending' });
     const [selectedStudent, setSelectedStudent] = useState<ProcessedStudentData | null>(null);
-    
+    const [currentPage, setCurrentPage] = useState(1);
+
     // Filters state
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedCircleTime, setSelectedCircleTime] = useState<string>('');
     const [selectedTeacher, setSelectedTeacher] = useState<string>('');
     const [selectedCircle, setSelectedCircle] = useState<string>('');
     const [selectedWeek, setSelectedWeek] = useState<string>('');
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedCircleTime, selectedTeacher, selectedCircle, selectedWeek]);
 
     // First, identify the students who are the focus of this page (those with multiple entries)
     const multiEntryUsernames = useMemo(() => {
@@ -118,14 +125,12 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         setSelectedWeek('');
     };
     
-    const { filteredAndSortedStudents, summary } = useMemo(() => {
+    const { filteredStudents, totalPages, summary } = useMemo(() => {
         let dataToProcess: ProcessedStudentData[];
 
         if (selectedWeek) {
-            // Un-aggregated data for the selected week, for students with multiple entries
             dataToProcess = baseStudentsForPage.filter(s => s.week === selectedWeek);
         } else {
-            // Aggregated data for students with multiple entries (original page logic)
             const aggregationMap = new Map<number, {
                 latestRow: ProcessedStudentData;
                 memAchieved: number;
@@ -214,10 +219,10 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
             dataToProcess = dataToProcess.filter(student => student.circle === selectedCircle);
         }
 
-        const sortableStudents = [...dataToProcess];
+        const sortedList = [...dataToProcess];
 
         if (sortConfig !== null) {
-            sortableStudents.sort((a, b) => {
+            sortedList.sort((a, b) => {
                 const aValue = a[sortConfig.key];
                 const bValue = b[sortConfig.key];
 
@@ -240,18 +245,24 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
         }
         
         const summary = {
-            totalMemorizationAchieved: sortableStudents.reduce((acc, s) => acc + s.memorizationPages.achieved, 0),
-            totalMemorizationRequired: sortableStudents.reduce((acc, s) => acc + s.memorizationPages.required, 0),
-            totalReviewAchieved: sortableStudents.reduce((acc, s) => acc + s.reviewPages.achieved, 0),
-            totalReviewRequired: sortableStudents.reduce((acc, s) => acc + s.reviewPages.required, 0),
-            totalConsolidationAchieved: sortableStudents.reduce((acc, s) => acc + s.consolidationPages.achieved, 0),
-            totalConsolidationRequired: sortableStudents.reduce((acc, s) => acc + s.consolidationPages.required, 0),
-            avgAttendance: sortableStudents.length > 0 ? sortableStudents.reduce((acc, s) => acc + s.attendance, 0) / sortableStudents.length : 0,
-            totalPoints: sortableStudents.reduce((acc, s) => acc + s.totalPoints, 0),
+            totalMemorizationAchieved: sortedList.reduce((acc, s) => acc + s.memorizationPages.achieved, 0),
+            totalMemorizationRequired: sortedList.reduce((acc, s) => acc + s.memorizationPages.required, 0),
+            totalReviewAchieved: sortedList.reduce((acc, s) => acc + s.reviewPages.achieved, 0),
+            totalReviewRequired: sortedList.reduce((acc, s) => acc + s.reviewPages.required, 0),
+            totalConsolidationAchieved: sortedList.reduce((acc, s) => acc + s.consolidationPages.achieved, 0),
+            totalConsolidationRequired: sortedList.reduce((acc, s) => acc + s.consolidationPages.required, 0),
+            avgAttendance: sortedList.length > 0 ? sortedList.reduce((acc, s) => acc + s.attendance, 0) / sortedList.length : 0,
+            totalPoints: sortedList.reduce((acc, s) => acc + s.totalPoints, 0),
         };
 
-        return { filteredAndSortedStudents: sortableStudents, summary };
-    }, [baseStudentsForPage, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek]);
+        const totalPages = Math.ceil(sortedList.length / ITEMS_PER_PAGE);
+        const paginatedList = sortedList.slice(
+            (currentPage - 1) * ITEMS_PER_PAGE,
+            currentPage * ITEMS_PER_PAGE
+        );
+
+        return { filteredStudents: paginatedList, totalPages, summary };
+    }, [baseStudentsForPage, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek, currentPage]);
 
     const handleSort = (key: SortKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
@@ -287,11 +298,16 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
                 showWeekFilter={true}
             />
             <ReportTable
-                students={filteredAndSortedStudents}
+                students={filteredStudents}
                 onRowClick={setSelectedStudent}
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 summary={summary}
+            />
+             <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
             />
             {selectedStudent && (
                 <StudentDetailModal
