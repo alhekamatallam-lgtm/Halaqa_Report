@@ -9,6 +9,7 @@ import EvaluationPage from './pages/EvaluationPage';
 import ExcellencePage from './pages/ExcellencePage';
 import TeacherAttendancePage from './pages/TeacherAttendancePage';
 import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
+import SupervisorAttendancePage from './pages/SupervisorAttendancePage';
 import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
 import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
@@ -16,7 +17,7 @@ import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
 import { Spinner } from './components/Spinner';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo } from './types';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
 
@@ -81,11 +82,15 @@ const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
         const password = (item['كلمة المرور'] || '').trim();
         const circle = (item['الحلقة'] || '').trim();
 
-        if (supervisorName && password && circle) {
+        if (supervisorName && password) {
             if (!supervisorMap.has(supervisorName)) {
                 supervisorMap.set(supervisorName, { password, circles: [] });
             }
-            supervisorMap.get(supervisorName)!.circles.push(circle);
+            
+            const supervisorEntry = supervisorMap.get(supervisorName)!;
+            if (circle && !supervisorEntry.circles.includes(circle)) {
+                supervisorEntry.circles.push(circle);
+            }
         }
     });
 
@@ -139,6 +144,59 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
         
         return {
             teacherName,
+            checkIn: times.checkIn,
+            checkOut: times.checkOut,
+            status,
+        };
+    });
+};
+
+const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], allSupervisorNames: string[]): SupervisorDailyAttendance[] => {
+    const timeZone = 'Asia/Riyadh';
+    const todayRiyadh = new Date(new Date().toLocaleString('en-US', { timeZone }));
+    todayRiyadh.setHours(0, 0, 0, 0);
+
+    const supervisorRecords = new Map<string, { checkIn: Date | null, checkOut: Date | null }>();
+
+    allSupervisorNames.forEach(name => {
+        supervisorRecords.set(name, { checkIn: null, checkOut: null });
+    });
+
+    data.forEach(item => {
+        const timestamp = new Date(item['time']);
+        if (isNaN(timestamp.getTime())) return;
+
+        const itemDateRiyadh = new Date(timestamp.toLocaleString('en-US', { timeZone }));
+        itemDateRiyadh.setHours(0, 0, 0, 0);
+        
+        const supervisorName = (item['name'] || '').trim();
+        const status = (item.status || '').trim();
+
+        if (itemDateRiyadh.getTime() === todayRiyadh.getTime() && supervisorRecords.has(supervisorName)) {
+            const record = supervisorRecords.get(supervisorName)!;
+
+            if (status === 'حضور' || status === 'الحضور') {
+                if (!record.checkIn || timestamp < record.checkIn) {
+                    record.checkIn = timestamp;
+                }
+            } else if (status === 'انصراف') {
+                 if (!record.checkOut || timestamp > record.checkOut) {
+                    record.checkOut = timestamp;
+                }
+            }
+        }
+    });
+
+    return Array.from(supervisorRecords.entries()).map(([supervisorName, times]) => {
+        let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
+        if (times.checkIn && times.checkOut) {
+            status = 'مكتمل الحضور';
+        } else if (times.checkIn) {
+            status = 'حاضر';
+        }
+        
+        return {
+            supervisorName,
             checkIn: times.checkIn,
             checkOut: times.checkOut,
             status,
@@ -268,7 +326,7 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
         timeZone,
     };
     
-    const dailyRecords = new Map<string, { supervisorName: string; date: string; checkIn: Date | null }>();
+    const dailyRecords = new Map<string, { supervisorName: string; date: string; checkIn: Date | null; checkOut: Date | null }>();
 
     data.forEach(item => {
         const timestamp = new Date(item.time);
@@ -283,13 +341,17 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
 
         let entry = dailyRecords.get(mapKey);
         if (!entry) {
-            entry = { supervisorName, date: dateString, checkIn: null };
+            entry = { supervisorName, date: dateString, checkIn: null, checkOut: null };
             dailyRecords.set(mapKey, entry);
         }
         
         if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
             if (!entry.checkIn || timestamp < entry.checkIn) {
                 entry.checkIn = timestamp;
+            }
+        } else if (status === 'انصراف') {
+            if (!entry.checkOut || timestamp > entry.checkOut) {
+                entry.checkOut = timestamp;
             }
         }
     });
@@ -324,6 +386,7 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
                                 supervisorName,
                                 date: dateString,
                                 checkIn: null,
+                                checkOut: null,
                             });
                         }
                     });
@@ -337,6 +400,7 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
         supervisorName: record.supervisorName,
         date: record.date,
         checkInTime: record.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkIn) : null,
+        checkOutTime: record.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkOut) : null,
     }));
 
     return report.sort((a, b) => {
@@ -508,7 +572,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
     }).filter((item): item is ProcessedStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -518,10 +582,12 @@ const App: React.FC = () => {
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
     const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
+    const [supervisorAttendance, setSupervisorAttendance] = useState<SupervisorDailyAttendance[]>([]);
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittingTeacher, setSubmittingTeacher] = useState<string | null>(null);
+    const [submittingSupervisor, setSubmittingSupervisor] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState<Page>('general');
     const [initialStudentFilter, setInitialStudentFilter] = useState<{ circle: string } | null>(null);
@@ -529,6 +595,7 @@ const App: React.FC = () => {
     const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     const asrTeachersInfo = useMemo(() => {
         const teacherInfoMap = new Map<string, TeacherInfo>();
@@ -569,7 +636,6 @@ const App: React.FC = () => {
                 }
                 
                 const dataContainer = allDataJson.data || {};
-                const supervisorAttendanceRaw = allDataJson.respon || [];
                 
                 const allStudentsRaw = dataContainer.report || [];
                 const sanitizedStudentsRaw = allStudentsRaw.map((row: any) => {
@@ -599,8 +665,13 @@ const App: React.FC = () => {
                 if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
                     const processedSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
                     setSupervisors(processedSupervisors);
+                    
                     const allSupervisorNames = processedSupervisors.map(s => s.supervisorName);
+                    const supervisorAttendanceRaw = dataContainer.respon || [];
                     if (Array.isArray(supervisorAttendanceRaw)) {
+                        const processedDailyAttendance = processSupervisorAttendanceData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], allSupervisorNames);
+                        setSupervisorAttendance(processedDailyAttendance);
+                        
                         const processedReport = processSupervisorAttendanceReportData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], allSupervisorNames);
                         setSupervisorAttendanceReport(processedReport);
                     }
@@ -684,14 +755,38 @@ const App: React.FC = () => {
     };
     
     const handlePostTeacherAttendance = async (teacherName: string, action: 'حضور' | 'انصراف') => {
-        setIsSubmitting(true);
         setSubmittingTeacher(teacherName);
+        setIsSubmitting(true);
         setNotification(null);
+
+        const originalAttendance = [...teacherAttendance];
+        const teacherIndex = teacherAttendance.findIndex(t => t.teacherName === teacherName);
+        if (teacherIndex === -1) {
+            setIsSubmitting(false);
+            setSubmittingTeacher(null);
+            return;
+        }
+
+        const updatedTeacher = { ...teacherAttendance[teacherIndex] };
+        const now = new Date();
+
+        if (action === 'حضور') {
+            updatedTeacher.checkIn = now;
+            updatedTeacher.status = 'حاضر';
+        } else {
+            updatedTeacher.checkOut = now;
+            updatedTeacher.status = 'مكتمل الحضور';
+        }
+
+        const newAttendance = [...teacherAttendance];
+        newAttendance[teacherIndex] = updatedTeacher;
+        setTeacherAttendance(newAttendance);
+
         const payload = {
             sheet: 'attandance',
             "name": teacherName,
             "status": action,
-            "time": new Date().toISOString(),
+            "time": now.toISOString(),
         };
 
         try {
@@ -700,46 +795,76 @@ const App: React.FC = () => {
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload),
             });
+            setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
         } catch (err) {
             if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-                console.log('Fetch error (attendance), likely due to Apps Script redirect. Proceeding.');
+                console.log('Fetch error (attendance), likely redirect. Assuming success.');
+                setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
             } else {
                 console.error("فشل في تسجيل الحضور:", err);
                 setNotification({ message: 'فشل في تسجيل الحضور. الرجاء التحقق من اتصالك.', type: 'error' });
-                setIsSubmitting(false);
-                setSubmittingTeacher(null);
-                return;
+                setTeacherAttendance(originalAttendance);
             }
-        }
-
-        try {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            const cacheBuster = `&v=${new Date().getTime()}`;
-            const attendanceResponse = await fetch(`${API_URL}?sheetName=attandance${cacheBuster}`);
-            if (!attendanceResponse.ok) throw new Error(`خطأ في تحديث الحضور: ${attendanceResponse.statusText}`);
-            const attendanceJson = await attendanceResponse.json();
-            
-            const dataContainer = attendanceJson.data || attendanceJson;
-            const attendanceRaw = dataContainer['attandance'] || (Array.isArray(dataContainer) ? dataContainer : []);
-            
-            if (!Array.isArray(attendanceRaw)) {
-                 throw new Error('تنسيق بيانات الحضور المحدثة غير صالح.');
-            }
-            
-            const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
-            const processedAttendance = processTeacherAttendanceData(rawAttendanceData, asrTeacherNames);
-            setTeacherAttendance(processedAttendance);
-
-            const processedReport = processTeacherAttendanceReportData(rawAttendanceData, asrTeacherNames);
-            setTeacherAttendanceReport(processedReport);
-
-            setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
-        } catch(refreshError) {
-            console.error("فشل تحديث بيانات الحضور:", refreshError);
-            setNotification({ message: 'تم التسجيل، ولكن فشل تحديث البيانات. حاول تحديث الصفحة.', type: 'error' });
         } finally {
             setIsSubmitting(false);
             setSubmittingTeacher(null);
+        }
+    };
+
+    const handlePostSupervisorAttendance = async (supervisorName: string, action: 'حضور' | 'انصراف') => {
+        setSubmittingSupervisor(supervisorName);
+        setIsSubmitting(true);
+        setNotification(null);
+
+        const originalAttendance = [...supervisorAttendance];
+        const supervisorIndex = supervisorAttendance.findIndex(s => s.supervisorName === supervisorName);
+        if (supervisorIndex === -1) {
+            setIsSubmitting(false);
+            setSubmittingSupervisor(null);
+            return;
+        }
+
+        const updatedSupervisor = { ...supervisorAttendance[supervisorIndex] };
+        const now = new Date();
+
+        if (action === 'حضور') {
+            updatedSupervisor.checkIn = now;
+            updatedSupervisor.status = 'حاضر';
+        } else {
+            updatedSupervisor.checkOut = now;
+            updatedSupervisor.status = 'مكتمل الحضور';
+        }
+
+        const newAttendance = [...supervisorAttendance];
+        newAttendance[supervisorIndex] = updatedSupervisor;
+        setSupervisorAttendance(newAttendance);
+
+        const payload = {
+            sheet: 'respon',
+            "name": supervisorName,
+            "status": action,
+            "time": now.toISOString(),
+        };
+
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload),
+            });
+            setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
+        } catch (err) {
+            if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+                console.log('Fetch error (supervisor attendance), likely redirect. Assuming success.');
+                setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
+            } else {
+                console.error("فشل في تسجيل حضور المشرف:", err);
+                setNotification({ message: 'فشل في تسجيل الحضور. الرجاء التحقق من اتصالك.', type: 'error' });
+                setSupervisorAttendance(originalAttendance);
+            }
+        } finally {
+            setIsSubmitting(false);
+            setSubmittingSupervisor(null);
         }
     };
 
@@ -787,6 +912,7 @@ const App: React.FC = () => {
         excellence: 'تميز الحلقات',
         teacherAttendance: 'حضور وانصراف المعلمين',
         teacherAttendanceReport: 'تقرير حضور المعلمين',
+        supervisorAttendance: 'حضور المشرفين',
         supervisorAttendanceReport: 'تقرير حضور المشرفين',
         dailyStudents: 'التقرير اليومي (طلاب)',
         dailyCircles: 'التقرير اليومي (حلقات)',
@@ -831,6 +957,16 @@ const App: React.FC = () => {
                 );
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+            case 'supervisorAttendance':
+                return (
+                    <SupervisorAttendancePage
+                        allSupervisors={supervisors.map(s => ({ name: s.supervisorName }))}
+                        attendanceStatus={supervisorAttendance}
+                        onSubmit={handlePostSupervisorAttendance}
+                        isSubmitting={isSubmitting}
+                        submittingSupervisor={submittingSupervisor}
+                    />
+                );
             case 'supervisorAttendanceReport':
                 return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
             case 'dailyStudents':
@@ -846,7 +982,12 @@ const App: React.FC = () => {
         <div className="flex h-screen bg-stone-100 text-stone-800 font-sans">
             <Notification notification={notification} onClose={() => setNotification(null)} />
             
-            <Sidebar currentPage={currentPage} onNavigate={handleNavigation} />
+            <Sidebar 
+                currentPage={currentPage} 
+                onNavigate={handleNavigation}
+                isCollapsed={isSidebarCollapsed}
+                onToggle={() => setIsSidebarCollapsed(prev => !prev)}
+            />
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 <header className="bg-white/80 backdrop-blur-sm shadow-md z-10 print-hidden border-b border-stone-200">

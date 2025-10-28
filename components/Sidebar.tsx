@@ -1,15 +1,30 @@
-import React from 'react';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport';
+import React from 'react';
+import { 
+    HomeIcon, 
+    TrophyIcon, 
+    LayoutDashboardIcon, 
+    ChartPieIcon, 
+    UsersIcon, 
+    ClipboardListIcon, 
+    ClipboardCheckIcon, 
+    CalendarDaysIcon,
+    ChevronRightIcon,
+    ChevronLeftIcon,
+} from './icons';
+
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport';
 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
+  isCollapsed: boolean;
+  onToggle: () => void;
 }
 
-const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const NavSection: React.FC<{ title: string; isCollapsed: boolean; children: React.ReactNode }> = ({ title, isCollapsed, children }) => (
     <div className="px-3 py-2">
-        <h3 className="px-3 text-xs font-semibold uppercase text-stone-500 tracking-wider">{title}</h3>
+        <h3 className={`px-3 text-xs font-semibold uppercase text-stone-500 tracking-wider transition-opacity duration-300 ${isCollapsed ? 'opacity-0 h-0' : 'opacity-100 h-auto'}`}>{!isCollapsed ? title : ''}</h3>
         <div className="mt-2 space-y-1">
             {children}
         </div>
@@ -18,57 +33,77 @@ const NavSection: React.FC<{ title: string; children: React.ReactNode }> = ({ ti
 
 const NavLink: React.FC<{
     label: string;
+    icon: React.ReactNode;
     isActive: boolean;
+    isCollapsed: boolean;
     onClick: () => void;
-}> = ({ label, isActive, onClick }) => (
+}> = ({ label, icon, isActive, isCollapsed, onClick }) => (
     <button
         onClick={onClick}
-        className={`w-full text-right flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 group ${
+        title={isCollapsed ? label : ''}
+        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 group relative ${
             isActive
                 ? 'bg-amber-100 text-amber-800 font-bold'
                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200'
-        }`}
+        } ${isCollapsed ? 'justify-center' : 'justify-start'}`}
     >
-        <span className="flex-1">{label}</span>
-         {isActive && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
+        <div className="flex-shrink-0">{icon}</div>
+        <span className={`flex-1 mr-3 transition-all duration-200 whitespace-nowrap ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>{label}</span>
+        {isActive && !isCollapsed && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCollapsed, onToggle }) => {
     return (
-        <aside className="w-64 flex-shrink-0 bg-stone-50 border-l border-stone-200 flex flex-col print-hidden">
-            <div className="h-24 flex items-center justify-center px-4 border-b border-stone-200">
-                <h2 className="text-xl font-bold text-stone-800 text-center">لوحة التحكم</h2>
+        <aside className={`flex-shrink-0 bg-stone-50 border-l border-stone-200 flex flex-col print-hidden transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
+            <div className={`h-24 flex items-center justify-center px-4 border-b border-stone-200`}>
+                <h2 className={`text-xl font-bold text-stone-800 text-center whitespace-nowrap transition-opacity duration-200 ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>لوحة التحكم</h2>
             </div>
             <nav className="flex-1 overflow-y-auto py-4">
                 <div className="px-3 py-2">
-                   <NavLink label="التقرير العام" isActive={currentPage === 'general'} onClick={() => onNavigate('general')} />
+                   <NavLink 
+                        label="التقرير العام" 
+                        icon={<HomeIcon className="w-5 h-5" />} 
+                        isActive={currentPage === 'general'} 
+                        isCollapsed={isCollapsed} 
+                        onClick={() => onNavigate('general')} 
+                    />
                 </div>
 
-                 <NavSection title="متابعة الحلقات">
-                    <NavLink label="تميز الحلقات" isActive={currentPage === 'excellence'} onClick={() => onNavigate('excellence')} />
-                    <NavLink label="متابعة الحلقات" isActive={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')} />
-                    <NavLink label="تقرير الحلقات" isActive={currentPage === 'circles'} onClick={() => onNavigate('circles')} />
-                    <NavLink label="تقرير الطلاب" isActive={currentPage === 'students'} onClick={() => onNavigate('students')} />
+                 <NavSection title="متابعة الحلقات" isCollapsed={isCollapsed}>
+                    <NavLink label="تميز الحلقات" icon={<TrophyIcon className="w-5 h-5" />} isActive={currentPage === 'excellence'} isCollapsed={isCollapsed} onClick={() => onNavigate('excellence')} />
+                    <NavLink label="متابعة الحلقات" icon={<LayoutDashboardIcon className="w-5 h-5" />} isActive={currentPage === 'dashboard'} isCollapsed={isCollapsed} onClick={() => onNavigate('dashboard')} />
+                    <NavLink label="تقرير الحلقات" icon={<ChartPieIcon className="w-5 h-5" />} isActive={currentPage === 'circles'} isCollapsed={isCollapsed} onClick={() => onNavigate('circles')} />
+                    <NavLink label="تقرير الطلاب" icon={<UsersIcon className="w-5 h-5" />} isActive={currentPage === 'students'} isCollapsed={isCollapsed} onClick={() => onNavigate('students')} />
                  </NavSection>
                  
-                 <NavSection title="التقرير اليومي">
-                    <NavLink label="متابعة الحلقات (يومي)" isActive={currentPage === 'dailyDashboard'} onClick={() => onNavigate('dailyDashboard')} />
-                    <NavLink label="التقرير اليومي (حلقات)" isActive={currentPage === 'dailyCircles'} onClick={() => onNavigate('dailyCircles')} />
-                    <NavLink label="التقرير اليومي (طلاب)" isActive={currentPage === 'dailyStudents'} onClick={() => onNavigate('dailyStudents')} />
-                    <NavLink label="ملاحظات" isActive={currentPage === 'notes'} onClick={() => onNavigate('notes')} />
+                 <NavSection title="التقرير اليومي" isCollapsed={isCollapsed}>
+                    <NavLink label="متابعة الحلقات (يومي)" icon={<LayoutDashboardIcon className="w-5 h-5" />} isActive={currentPage === 'dailyDashboard'} isCollapsed={isCollapsed} onClick={() => onNavigate('dailyDashboard')} />
+                    <NavLink label="التقرير اليومي (حلقات)" icon={<ChartPieIcon className="w-5 h-5" />} isActive={currentPage === 'dailyCircles'} isCollapsed={isCollapsed} onClick={() => onNavigate('dailyCircles')} />
+                    <NavLink label="التقرير اليومي (طلاب)" icon={<UsersIcon className="w-5 h-5" />} isActive={currentPage === 'dailyStudents'} isCollapsed={isCollapsed} onClick={() => onNavigate('dailyStudents')} />
+                    <NavLink label="ملاحظات" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'notes'} isCollapsed={isCollapsed} onClick={() => onNavigate('notes')} />
                  </NavSection>
 
-                 <NavSection title="التقييم">
-                    <NavLink label="تقييم الحلقة" isActive={currentPage === 'evaluation'} onClick={() => onNavigate('evaluation')} />
+                 <NavSection title="التقييم" isCollapsed={isCollapsed}>
+                    <NavLink label="تقييم الحلقة" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'evaluation'} isCollapsed={isCollapsed} onClick={() => onNavigate('evaluation')} />
                  </NavSection>
                  
-                 <NavSection title="الحضور والإنصراف">
-                    <NavLink label="حضور المعلمين" isActive={currentPage === 'teacherAttendance'} onClick={() => onNavigate('teacherAttendance')} />
-                    <NavLink label="تقرير حضور المعلمين" isActive={currentPage === 'teacherAttendanceReport'} onClick={() => onNavigate('teacherAttendanceReport')} />
-                    <NavLink label="تقرير حضور المشرفين" isActive={currentPage === 'supervisorAttendanceReport'} onClick={() => onNavigate('supervisorAttendanceReport')} />
+                 <NavSection title="الحضور والإنصراف" isCollapsed={isCollapsed}>
+                    <NavLink label="حضور المعلمين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'teacherAttendance'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherAttendance')} />
+                    <NavLink label="تقرير حضور المعلمين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'teacherAttendanceReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherAttendanceReport')} />
+                    <NavLink label="حضور المشرفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'supervisorAttendance'} isCollapsed={isCollapsed} onClick={() => onNavigate('supervisorAttendance')} />
+                    <NavLink label="تقرير حضور المشرفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'supervisorAttendanceReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('supervisorAttendanceReport')} />
                  </NavSection>
             </nav>
+            <div className="p-3 border-t border-stone-200">
+                <button
+                    onClick={onToggle}
+                    aria-label={isCollapsed ? "توسيع القائمة" : "تصغير القائمة"}
+                    className="w-full flex items-center justify-center p-2 text-sm font-medium text-stone-600 rounded-md hover:bg-stone-200 hover:text-stone-900 transition-colors"
+                >
+                    {isCollapsed ? <ChevronLeftIcon className="w-5 h-5" /> : <ChevronRightIcon className="w-5 h-5" />}
+                </button>
+            </div>
         </aside>
     );
 };

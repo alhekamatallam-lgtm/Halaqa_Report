@@ -157,13 +157,14 @@ export interface TeacherAttendanceSummaryEntry {
 export interface RawSupervisorAttendanceData {
   "time": string;
   "name": string;
-  "status": 'الحضور' | 'حضور' | string;
+  "status": 'حضور' | 'انصراف' | 'الحضور';
 }
 
 export interface SupervisorAttendanceReportEntry {
   supervisorName: string;
   date: string;
   checkInTime: string | null;
+  checkOutTime: string | null;
 }
 
 export interface SupervisorAttendanceSummaryEntry {
@@ -171,4 +172,15 @@ export interface SupervisorAttendanceSummaryEntry {
   presentDays: number;
   absentDays: number;
   attendanceRate: number;
+}
+
+export interface SupervisorInfo {
+  name: string;
+}
+
+export interface SupervisorDailyAttendance {
+  supervisorName: string;
+  checkIn: Date | null;
+  checkOut: Date | null;
+  status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور';
 }

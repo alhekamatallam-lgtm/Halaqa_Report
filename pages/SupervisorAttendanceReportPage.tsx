@@ -52,7 +52,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
             summaryMap.set(item.supervisorName, { presentDates: new Set(), absentDates: new Set() });
         }
         const supervisorSummary = summaryMap.get(item.supervisorName)!;
-        const isAbsent = item.checkInTime === null;
+        const isAbsent = item.checkInTime === null && item.checkOutTime === null;
 
         if (isAbsent) {
             supervisorSummary.absentDates.add(item.date);
@@ -108,7 +108,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
     filteredData
         .filter(item => item.supervisorName === supervisorName)
         .forEach(item => {
-            const isAbsent = item.checkInTime === null;
+            const isAbsent = item.checkInTime === null && item.checkOutTime === null;
             if ((type === 'present' && !isAbsent) || (type === 'absent' && isAbsent)) {
                 dateSet.add(item.date);
             }
@@ -212,31 +212,35 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">اسم المشرف</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">التاريخ</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">وقت الحضور</th>
+                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">وقت الانصراف</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
                   {paginatedDetailedData.length > 0 ? (
                     paginatedDetailedData.map((item, index) => {
-                      const isAbsent = item.checkInTime === null;
+                      const isAbsent = item.checkInTime === null && item.checkOutTime === null;
                       const rowClass = isAbsent ? 'bg-red-50/70 absent-row-print' : (index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70');
 
                       return (
                         <tr key={`${item.date}-${item.supervisorName}-${index}`} className={`${rowClass} hover:bg-amber-100/60 transition-all`}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.supervisorName}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })}</td>
-                          {isAbsent ? (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
+                           {isAbsent ? (
+                            <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
                               غائب
                             </td>
                           ) : (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkInTime || '---'}</td>
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkInTime || '---'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkOutTime || '---'}</td>
+                            </>
                           )}
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={3} className="px-6 py-12 text-center text-stone-500">
+                      <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
                         لا توجد بيانات تطابق الفلتر المحدد.
                       </td>
                     </tr>
