@@ -1,4 +1,3 @@
-
 export interface RawStudentData {
   "الطالب": string;
   "اسم المستخدم": number;
@@ -108,6 +107,42 @@ export interface EvaluationSubmissionData {
   "نسبة الحضور": number;
   "المؤشر العام": number;
   "التقييم العام": number;
+}
+
+export interface ExamSubmissionData {
+    "الطالب": string;
+    "الحلقة": string;
+    "الاختبار  ": string;
+    "السؤال الاول": number;
+    "السؤال الثاني": number;
+    "السؤال الثالث": number;
+    "السؤال الرابع": number;
+    "السؤال الخامس": number;
+    "إجمالي الدرجة": number;
+}
+
+export interface RawExamData {
+    "الطالب": string;
+    "الحلقة": string;
+    "الاختبار  ": string;
+    "السؤال الاول": number | string;
+    "السؤال الثاني": number | string;
+    "السؤال الثالث": number | string;
+    "السؤال الرابع": number | string;
+    "السؤال الخامس": number | string;
+    "إجمالي الدرجة": number | string;
+}
+
+export interface ProcessedExamData {
+    studentName: string;
+    circle: string;
+    examName: string;
+    q1: number;
+    q2: number;
+    q3: number;
+    q4: number;
+    q5: number;
+    totalScore: number;
 }
 
 export interface RawSupervisorData {

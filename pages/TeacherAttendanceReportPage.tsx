@@ -139,7 +139,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
 
   return (
     <div className="space-y-6">
-      <div className="sticky top-0 z-20 bg-white p-6 rounded-xl shadow-xl border border-stone-200 print-hidden">
+      <div className="bg-white p-6 rounded-xl shadow-xl border border-stone-200 print-hidden">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div>
             <label htmlFor="start-date" className="block text-sm font-medium text-stone-700 mb-2">من تاريخ</label>

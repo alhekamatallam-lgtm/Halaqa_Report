@@ -34,7 +34,6 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
   }, [isOpen]);
 
   const teachers = useMemo(() => {
-    // FIX: Explicitly type the Set to string to help with type inference.
     const teacherSet = new Set<string>(students.map(s => s.teacherName).filter(item => item));
     return Array.from(teacherSet).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [students]);
@@ -42,7 +41,6 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
   const availableCircles = useMemo(() => {
     if (!selectedTeacher) return [];
     
-    // FIX: Explicitly type the Set to string to help with type inference.
     const circleSet = new Set<string>(
         students
             .filter(s => s.teacherName === selectedTeacher)

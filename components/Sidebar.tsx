@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
     HomeIcon, 
@@ -13,7 +12,7 @@ import {
     ChevronLeftIcon,
 } from './icons';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport';
 
 interface SidebarProps {
   currentPage: Page;
@@ -84,8 +83,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                     <NavLink label="ملاحظات" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'notes'} isCollapsed={isCollapsed} onClick={() => onNavigate('notes')} />
                  </NavSection>
 
-                 <NavSection title="التقييم" isCollapsed={isCollapsed}>
+                 <NavSection title="التقييم والاختبارات" isCollapsed={isCollapsed}>
                     <NavLink label="تقييم الحلقة" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'evaluation'} isCollapsed={isCollapsed} onClick={() => onNavigate('evaluation')} />
+                    <NavLink label="إدخال الاختبارات" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'exam'} isCollapsed={isCollapsed} onClick={() => onNavigate('exam')} />
+                    <NavLink label="تقرير الاختبارات" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'examReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('examReport')} />
                  </NavSection>
                  
                  <NavSection title="الحضور والإنصراف" isCollapsed={isCollapsed}>
@@ -99,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                 <button
                     onClick={onToggle}
                     aria-label={isCollapsed ? "توسيع القائمة" : "تصغير القائمة"}
-                    className="w-full flex items-center justify-center p-2 text-sm font-medium text-stone-600 rounded-md hover:bg-stone-200 hover:text-stone-900 transition-colors"
+                    className="w-full flex items-center justify-center p-2 text-sm font-semibold text-amber-900 rounded-md bg-amber-200 hover:bg-amber-300 transition-colors duration-200"
                 >
                     {isCollapsed ? <ChevronLeftIcon className="w-5 h-5" /> : <ChevronRightIcon className="w-5 h-5" />}
                 </button>

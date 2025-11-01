@@ -13,11 +13,13 @@ import SupervisorAttendancePage from './pages/SupervisorAttendancePage';
 import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
 import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
+import ExamPage from './pages/ExamPage';
+import ExamReportPage from './pages/ExamReportPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
 import { Spinner } from './components/Spinner';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData } from './types';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
 
@@ -572,13 +574,36 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
     }).filter((item): item is ProcessedStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport';
+const processExamData = (data: RawExamData[]): ProcessedExamData[] => {
+    const normalize = (val: any): string => String(val || '').trim();
+    const parseNum = (val: any): number => Number(val) || 0;
+
+    return data.map(item => {
+        const studentName = normalize(item["الطالب"]);
+        if (!studentName) return null;
+
+        return {
+            studentName,
+            circle: normalize(item["الحلقة"]),
+            examName: normalize(item["الاختبار  "]),
+            q1: parseNum(item["السؤال الاول"]),
+            q2: parseNum(item["السؤال الثاني"]),
+            q3: parseNum(item["السؤال الثالث"]),
+            q4: parseNum(item["السؤال الرابع"]),
+            q5: parseNum(item["السؤال الخامس"]),
+            totalScore: parseNum(item["إجمالي الدرجة"]),
+        };
+    }).filter((item): item is ProcessedExamData => item !== null);
+};
+
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
     const [dailyStudents, setDailyStudents] = useState<ProcessedStudentData[]>([]);
     const [evaluationData, setEvaluationData] = useState<CircleEvaluationData[]>([]);
+    const [examData, setExamData] = useState<ProcessedExamData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
     const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
@@ -659,6 +684,12 @@ const App: React.FC = () => {
                 if (evaluationSheetData && Array.isArray(evaluationSheetData)) {
                     const processedEvaluations = processEvaluationData(evaluationSheetData as RawCircleEvaluationData[]);
                     setEvaluationData(processedEvaluations);
+                }
+
+                const examSheetData = dataContainer.exam;
+                if (examSheetData && Array.isArray(examSheetData)) {
+                    const processedExams = processExamData(examSheetData as RawExamData[]);
+                    setExamData(processedExams);
                 }
 
                 const supervisorSheetData = dataContainer['supervisor'];
@@ -749,6 +780,33 @@ const App: React.FC = () => {
         } catch(refreshError) {
              console.error("فشل في تحديث البيانات بعد الإرسال:", refreshError);
              setNotification({ message: 'تم الإرسال، ولكن فشل تحديث البيانات. حاول تحديث الصفحة.', type: 'error' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handlePostExam = async (data: ExamSubmissionData) => {
+        setIsSubmitting(true);
+        setNotification(null);
+        try {
+            const payload = {
+                sheet: 'exam',
+                ...data
+            };
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload),
+            });
+            setNotification({ message: `تم رصد درجة الطالب ${data['الطالب']} بنجاح!`, type: 'success' });
+        } catch (err) {
+             if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+                console.log('Fetch error (exam), likely redirect. Assuming success.');
+                setNotification({ message: `تم رصد درجة الطالب ${data['الطالب']} بنجاح!`, type: 'success' });
+             } else {
+                console.error("فشل في إرسال درجة الاختبار:", err);
+                setNotification({ message: 'فشل في إرسال درجة الاختبار. الرجاء التحقق من اتصالك.', type: 'error' });
+             }
         } finally {
             setIsSubmitting(false);
         }
@@ -870,7 +928,7 @@ const App: React.FC = () => {
 
     const handleNavigation = (page: Page) => {
         setInitialStudentFilter(null);
-        if (page === 'evaluation' && !authenticatedUser) {
+        if ((page === 'evaluation' || page === 'exam') && !authenticatedUser) {
             setCurrentPage(page);
             setShowPasswordModal(true);
         } else {
@@ -916,6 +974,8 @@ const App: React.FC = () => {
         supervisorAttendanceReport: 'تقرير حضور المشرفين',
         dailyStudents: 'التقرير اليومي (طلاب)',
         dailyCircles: 'التقرير اليومي (حلقات)',
+        exam: `إدخال درجات الاختبار ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
+        examReport: 'تقرير الاختبارات',
     };
 
     const renderPage = () => {
@@ -945,6 +1005,18 @@ const App: React.FC = () => {
                         authenticatedUser={authenticatedUser}
                     />
                 );
+            case 'exam':
+                 if (!authenticatedUser) return null;
+                return (
+                    <ExamPage
+                        onSubmit={handlePostExam}
+                        isSubmitting={isSubmitting}
+                        students={students}
+                        authenticatedUser={authenticatedUser}
+                    />
+                );
+            case 'examReport':
+                return <ExamReportPage examData={examData} />;
             case 'teacherAttendance':
                 return (
                     <TeacherAttendancePage 
@@ -1014,8 +1086,8 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
-                        if (currentPage !== 'evaluation') {
-                            setCurrentPage('evaluation');
+                        if (currentPage !== 'evaluation' && currentPage !== 'exam') {
+                             setCurrentPage(currentPage); // Stay on current page if it's not eval/exam
                         }
                     }}
                     onClose={() => setShowPasswordModal(false)}
