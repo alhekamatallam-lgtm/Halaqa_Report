@@ -18,26 +18,19 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
   const [totalScore, setTotalScore] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const latestWeek = useMemo(() => {
-    if (!students || students.length === 0) return null;
-    const allWeeks = [...new Set<string>(students.map(s => s.week).filter((w): w is string => !!w))];
-    if (allWeeks.length === 0) return null;
-    allWeeks.sort((a, b) => a.localeCompare(b, 'ar'));
-    return allWeeks[allWeeks.length - 1];
+  const studentsForExam = useMemo(() => {
+    // بناءً على الطلب، يتم فلترة بيانات الطلاب من ورقة "report" المصدر لعرض "الأسبوع التاسع" بشكل حصري.
+    const targetWeek = "التاسع"; // FIX: Value changed from "الأسبوع التاسع" to match actual data from screenshot.
+    return students.filter(s => s.week === targetWeek);
   }, [students]);
-
-  const studentsFromLatestWeek = useMemo(() => {
-    if (!latestWeek) return students; // Fallback to all students if no weeks are defined
-    return students.filter(s => s.week === latestWeek);
-  }, [students, latestWeek]);
 
   const manageableStudents = useMemo(() => {
     if (authenticatedUser.role === 'admin') {
-      return studentsFromLatestWeek;
+      return studentsForExam;
     }
     const supervisorCircles = new Set(authenticatedUser.circles);
-    return studentsFromLatestWeek.filter(s => supervisorCircles.has(s.circle));
-  }, [studentsFromLatestWeek, authenticatedUser]);
+    return studentsForExam.filter(s => supervisorCircles.has(s.circle));
+  }, [studentsForExam, authenticatedUser]);
 
   const circles = useMemo(() => {
     const circleSet = new Set<string>(manageableStudents.map(s => s.circle).filter(Boolean));
@@ -46,7 +39,15 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
 
   const availableStudents = useMemo(() => {
     if (!selectedCircle) return [];
-    return manageableStudents.filter(s => s.circle === selectedCircle).sort((a, b) => a.studentName.localeCompare(b.studentName, 'ar'));
+    const studentsInCircle = manageableStudents.filter(s => s.circle === selectedCircle);
+
+    // Deduplicate students by username to prevent duplicates in the dropdown.
+    const uniqueStudents = Array.from(
+        new Map(studentsInCircle.map(student => [student.username, student])).values()
+    );
+
+    // FIX: Add explicit types for sort callback parameters to fix type inference issue.
+    return uniqueStudents.sort((a: ProcessedStudentData, b: ProcessedStudentData) => a.studentName.localeCompare(b.studentName, 'ar'));
   }, [manageableStudents, selectedCircle]);
 
   useEffect(() => {
@@ -92,7 +93,8 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
         return;
     }
 
-    const studentData = JSON.parse(selectedStudent);
+    // FIX: Added type annotation for the parsed student data object.
+    const studentData: { studentName: string; circle: string } = JSON.parse(selectedStudent);
     const finalTotalScore = finalScores.reduce((a, b) => a + b, 0);
 
     const submissionData: ExamSubmissionData = {
@@ -111,13 +113,30 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
     resetForm();
   };
 
+  if (manageableStudents.length === 0) {
+    return (
+        <div className="max-w-4xl mx-auto">
+            <div className="bg-white p-8 rounded-2xl shadow-xl border border-stone-200 text-center">
+                 <div className="text-center mb-4">
+                    <h2 className="text-2xl font-bold text-stone-800">لا توجد بيانات لعرضها</h2>
+                    <p className="text-stone-500 mt-2">
+                        لم يتم العثور على طلاب مسجلين في الأسبوع التاسع.
+                        <br />
+                        {authenticatedUser.role === 'supervisor' && 'قد لا يكون لديك طلاب مسجلون في هذا الأسبوع.'}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-stone-200">
             <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-stone-800">نموذج رصد درجات الاختبار</h2>
-                <p className="text-stone-500 mt-2">
-                    {latestWeek ? `يتم عرض الطلاب بناءً على بيانات آخر أسبوع (${latestWeek}).` : 'الرجاء إدخال بيانات الاختبار للطالب المختار.'}
+                <p className="text-stone-500 mt-2 font-semibold">
+                    الأسبوع: <span className="text-amber-600">التاسع</span>
                 </p>
             </div>
             
@@ -125,14 +144,14 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label htmlFor="circle-select" className="block text-sm font-medium text-stone-700 mb-2">الحلقة</label>
-                        <select id="circle-select" value={selectedCircle} onChange={(e) => setSelectedCircle(e.target.value)} required className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md">
+                        <select id="circle-select" value={selectedCircle} onChange={(e) => setSelectedCircle(e.target.value)} required className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md">
                             <option value="">-- اختر الحلقة --</option>
                             {circles.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
                     <div>
                         <label htmlFor="student-select" className="block text-sm font-medium text-stone-700 mb-2">الطالب</label>
-                        <select id="student-select" value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} required disabled={!selectedCircle} className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md disabled:bg-stone-100">
+                        <select id="student-select" value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} required disabled={!selectedCircle} className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md disabled:bg-stone-100">
                             <option value="">-- اختر الطالب --</option>
                             {availableStudents.map(s => <option key={s.username} value={JSON.stringify({ studentName: s.studentName, circle: s.circle })}>{s.studentName}</option>)}
                         </select>
@@ -141,19 +160,19 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
 
                 <div>
                     <label htmlFor="exam-name" className="block text-sm font-medium text-stone-700 mb-2">اسم الاختبار</label>
-                    <input type="text" id="exam-name" value={examName} onChange={(e) => setExamName(e.target.value)} required placeholder="مثال: جزء 1 ف1" className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
+                    <input type="text" id="exam-name" value={examName} onChange={(e) => setExamName(e.target.value)} required placeholder="مثال: جزء 1 ف1" className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
                 </div>
                 
                 <div className="pt-4 border-t border-stone-200">
                     <h3 className="text-lg font-semibold text-stone-800 mb-4">الدرجات (من 20 لكل سؤال)</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 items-end">
                         {scores.map((score, index) => (
                             <div key={index} className="md:col-span-1">
                                 <label htmlFor={`score-${index}`} className="block text-sm font-medium text-stone-700 mb-2">{`السؤال ${index + 1}`}</label>
-                                <input type="number" id={`score-${index}`} value={score} onChange={(e) => handleScoreChange(index, e.target.value)} required min="0" max="20" className="block w-full text-center py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
+                                <input type="number" id={`score-${index}`} value={score} onChange={(e) => handleScoreChange(index, e.target.value)} required min="0" max="20" className="block w-full text-center py-2 text-base border border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
                             </div>
                         ))}
-                        <div className="col-span-2 md:col-span-1 bg-stone-100 p-4 rounded-lg text-center">
+                        <div className="col-span-1 sm:col-span-2 md:col-span-1 bg-stone-100 p-4 rounded-lg text-center">
                             <label className="block text-sm font-medium text-stone-700">الإجمالي</label>
                             <p className="text-3xl font-bold text-amber-600 mt-2">{totalScore}</p>
                         </div>

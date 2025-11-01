@@ -55,8 +55,9 @@ const NavLink: React.FC<{
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCollapsed, onToggle }) => {
     return (
         <aside className={`flex-shrink-0 bg-stone-50 border-l border-stone-200 flex flex-col print-hidden transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
-            <div className={`h-24 flex items-center justify-center px-4 border-b border-stone-200`}>
-                <h2 className={`text-xl font-bold text-stone-800 text-center whitespace-nowrap transition-opacity duration-200 ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>لوحة التحكم</h2>
+            <div className={`h-24 flex items-center px-4 border-b border-stone-200 transition-all duration-300 ${isCollapsed ? 'justify-center' : 'justify-start'}`}>
+                <img src="https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png" alt="شعار المجمع" className={`transition-all duration-300 ${isCollapsed ? 'h-12' : 'h-16'}`} />
+                <h2 className={`text-xl font-bold text-stone-800 mr-2 whitespace-nowrap transition-all duration-200 ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>التقرير</h2>
             </div>
             <nav className="flex-1 overflow-y-auto py-4">
                 <div className="px-3 py-2">

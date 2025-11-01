@@ -18,10 +18,10 @@ import ExamReportPage from './pages/ExamReportPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import { Spinner } from './components/Spinner';
 import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData } from './types';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
+const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
 
 const parseAchievement = (value: any): Achievement => {
   const strValue = String(value || '');
@@ -949,8 +949,9 @@ const App: React.FC = () => {
     
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center h-screen">
-                <Spinner />
+            <div className="flex flex-col justify-center items-center h-screen bg-stone-50">
+                <img src={LOGO_URL} alt="شعار المجمع" className="w-40 h-40 animate-pulse mb-4" />
+                <p className="text-stone-600 font-semibold">...جاري تحميل البيانات</p>
             </div>
         );
     }
@@ -1064,12 +1065,22 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <header className="bg-white/80 backdrop-blur-sm shadow-md z-10 print-hidden border-b border-stone-200">
                     <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="text-center pt-5">
-                            <h2 className="text-lg font-semibold text-stone-600">مجمع الراجحي بشبرا - نظام متابعة أداء الحلقات</h2>
+                        <div className="flex items-center justify-between py-2">
+                            <div className="flex items-center gap-3">
+                                <img src={LOGO_URL} alt="شعار المجمع" className="h-14 md:h-16" />
+                                <div className='hidden sm:block'>
+                                    <h2 className="text-lg font-semibold text-stone-600">مجمع الراجحي بشبرا</h2>
+                                    <p className="text-sm text-stone-500">نظام متابعة أداء الحلقات</p>
+                                </div>
+                            </div>
+                            <div className="text-center flex-grow">
+                                <h1 className="text-xl sm:text-2xl font-bold leading-tight text-stone-800">
+                                    {titles[currentPage]}
+                                </h1>
+                            </div>
+                            <div className="w-24 sm:w-48"> {/* Spacer to help center the title */}
+                            </div>
                         </div>
-                        <h1 className="text-3xl font-bold leading-tight text-center text-stone-800 pt-1 pb-5">
-                            {titles[currentPage]}
-                        </h1>
                     </div>
                 </header>
                 
