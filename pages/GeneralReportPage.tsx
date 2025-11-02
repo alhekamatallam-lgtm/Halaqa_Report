@@ -52,51 +52,32 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, description, icon }) 
 );
 
 // --- Main Page Component ---
-const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ students }) => {
+const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStudents: ProcessedStudentData[] }> = ({ students, dailyStudents }) => {
 
   const stats: GeneralReportStats = useMemo(() => {
+    // 1. Filter daily data for the target day.
+    const targetDay = 'الأحد: 02-11';
+    const dailyStudentsForTargetDay = dailyStudents.filter(s => s.day === targetDay);
+    
+    // 2. Calculate stats from the daily data.
+    const totalStudentsForTargetDay = new Set(dailyStudentsForTargetDay.map(s => s.username)).size;
+    const totalAttendanceForDay = dailyStudentsForTargetDay.reduce((sum, s) => sum + s.attendance, 0);
+    const avgAttendanceForDay = dailyStudentsForTargetDay.length > 0 ? totalAttendanceForDay / dailyStudentsForTargetDay.length : 0;
+
+    // Handle case where there's no weekly data for other stats.
     if (students.length === 0) {
       return {
-        totalCircles: 0, totalStudents: 0, totalMemorization: 0, totalReview: 0,
-        totalConsolidation: 0, totalAchievement: 0, avgAttendance: 0,
+        totalCircles: 0,
+        totalStudents: totalStudentsForTargetDay,
+        totalMemorization: 0,
+        totalReview: 0,
+        totalConsolidation: 0,
+        totalAchievement: 0,
+        avgAttendance: avgAttendanceForDay,
       };
     }
-
-    const studentsByWeek = students.reduce((acc, student) => {
-        const week = student.week;
-        if (week) {
-            if (!acc.has(week)) {
-                acc.set(week, []);
-            }
-            acc.get(week)!.push(student);
-        }
-        return acc;
-    }, new Map<string, ProcessedStudentData[]>());
-
-    const weeklyStudentCounts: number[] = [];
-    const weeklyAvgAttendances: number[] = [];
-
-    studentsByWeek.forEach((weeklyStudents) => {
-        // Student count per week
-        const uniqueUsernames = new Set(weeklyStudents.map(s => s.username));
-        weeklyStudentCounts.push(uniqueUsernames.size);
-
-        // Attendance avg per week
-        if (weeklyStudents.length > 0) {
-            const weeklyTotalAttendance = weeklyStudents.reduce((sum, s) => sum + s.attendance, 0);
-            weeklyAvgAttendances.push(weeklyTotalAttendance / weeklyStudents.length);
-        }
-    });
-
-    const avgStudents = weeklyStudentCounts.length > 0
-        ? weeklyStudentCounts.reduce((sum, count) => sum + count, 0) / weeklyStudentCounts.length
-        : new Set(students.map(s => s.username)).size; // Fallback for data with no weeks
-    const totalStudents = Math.round(avgStudents);
     
-    const avgAttendance = weeklyAvgAttendances.length > 0
-        ? weeklyAvgAttendances.reduce((sum, avg) => sum + avg, 0) / weeklyAvgAttendances.length
-        : (students.length > 0 ? students.reduce((sum, s) => sum + s.attendance, 0) / students.length : 0); // Fallback
-
+    // 3. Calculate other stats from the full weekly student list ('report' sheet).
     const totalCircles = new Set(students.map(s => s.circle)).size;
     const totalMemorization = students.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
     const totalReview = students.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
@@ -104,20 +85,33 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
     const totalAchievement = totalMemorization + totalReview + totalConsolidation;
 
     return {
-      totalCircles, totalStudents, totalMemorization, totalReview,
-      totalConsolidation, totalAchievement, avgAttendance,
+      totalCircles,
+      totalStudents: totalStudentsForTargetDay,
+      totalMemorization,
+      totalReview,
+      totalConsolidation,
+      totalAchievement,
+      avgAttendance: avgAttendanceForDay,
     };
-  }, [students]);
+  }, [students, dailyStudents]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-      <StatCard icon={<CircleIcon />} label="عدد الحلقات" value={stats.totalCircles} />
-      <StatCard icon={<StudentIcon />} label="عدد الطلاب" value={stats.totalStudents} description="متوسط عدد الطلاب الفريدين أسبوعيًا" />
-      <StatCard icon={<AttendanceIcon />} label="متوسط نسبة الحضور" value={`${(stats.avgAttendance * 100).toFixed(1)}%`} />
+      <StatCard icon={<CircleIcon />} label="إجمالي الحلقات" value={stats.totalCircles} description="جميع الحلقات الفعالة" />
+      <StatCard 
+        icon={<StudentIcon />} 
+        label="عدد الطلاب (يوم الأحد: 02-11)" 
+        value={stats.totalStudents} 
+      />
+      <StatCard 
+        icon={<AttendanceIcon />} 
+        label="متوسط الحضور (يوم الأحد: 02-11)" 
+        value={`${(stats.avgAttendance * 100).toFixed(1)}%`} 
+      />
       
-      <StatCard icon={<BookIcon />} label="إجمالي أوجه الحفظ" value={stats.totalMemorization.toFixed(1)} />
-      <StatCard icon={<BookIcon />} label="إجمالي أوجه المراجعة" value={stats.totalReview.toFixed(1)} />
-      <StatCard icon={<BookIcon />} label="إجمالي أوجه التثبيت" value={stats.totalConsolidation.toFixed(1)} />
+      <StatCard icon={<BookIcon />} label="إجمالي الحفظ" value={stats.totalMemorization.toFixed(1)} description="مجموع أوجه الحفظ لجميع الأسابيع" />
+      <StatCard icon={<BookIcon />} label="إجمالي المراجعة" value={stats.totalReview.toFixed(1)} description="مجموع أوجه المراجعة لجميع الأسابيع" />
+      <StatCard icon={<BookIcon />} label="إجمالي التثبيت" value={stats.totalConsolidation.toFixed(1)} description="مجموع أوجه التثبيت لجميع الأسابيع" />
       
       <div className="sm:col-span-2 lg:col-span-3">
          <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center space-x-reverse space-x-6 transform hover:scale-105 transition-transform duration-300 border-t-4 border-stone-800">
@@ -126,8 +120,8 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ stu
              </div>
              <div>
                 <p className="text-3xl font-bold text-stone-800 tracking-tight">{stats.totalAchievement.toFixed(1)}</p>
-                <p className="text-lg font-semibold text-stone-600 truncate">إجمالي أوجه الإنجاز</p>
-                <p className="text-sm text-stone-500 mt-1 font-medium">مجموع أوجه الحفظ والمراجعة والتثبيت</p>
+                <p className="text-lg font-semibold text-stone-600 truncate">إجمالي الإنجاز العام</p>
+                <p className="text-sm text-stone-500 mt-1 font-medium">مجموع أوجه الحفظ والمراجعة والتثبيت لجميع الأسابيع</p>
              </div>
          </div>
       </div>

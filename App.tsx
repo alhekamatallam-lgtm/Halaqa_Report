@@ -986,7 +986,7 @@ const App: React.FC = () => {
             case 'circles':
                 return <CircleReportPage students={students} supervisors={supervisors} />;
             case 'general':
-                return <GeneralReportPage students={students} />;
+                return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
             case 'dashboard':
                 return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
             case 'dailyDashboard':
@@ -1047,7 +1047,7 @@ const App: React.FC = () => {
             case 'dailyCircles':
                 return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
             default:
-                return <GeneralReportPage students={students} />;
+                return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
         }
     };
 
