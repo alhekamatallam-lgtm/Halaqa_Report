@@ -219,3 +219,13 @@ export interface SupervisorDailyAttendance {
   checkOut: Date | null;
   status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور';
 }
+
+export interface RawRegisteredStudentData {
+  "الطالب": string;
+  "الحلقة": string;
+}
+
+export interface ProcessedRegisteredStudentData {
+  studentName: string;
+  circle: string;
+}

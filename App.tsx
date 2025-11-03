@@ -18,7 +18,7 @@ import ExamReportPage from './pages/ExamReportPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData } from './types';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
@@ -596,6 +596,18 @@ const processExamData = (data: RawExamData[]): ProcessedExamData[] => {
     }).filter((item): item is ProcessedExamData => item !== null);
 };
 
+const processRegisteredStudentData = (data: RawRegisteredStudentData[]): ProcessedRegisteredStudentData[] => {
+    const normalize = (val: any): string => String(val || '').trim();
+    return data
+        .map(item => {
+            const studentName = normalize(item["الطالب"]);
+            const circle = normalize(item["الحلقة"]);
+            if (!studentName || !circle) return null;
+            return { studentName, circle };
+        })
+        .filter((item): item is ProcessedRegisteredStudentData => item !== null);
+};
+
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
@@ -604,6 +616,7 @@ const App: React.FC = () => {
     const [dailyStudents, setDailyStudents] = useState<ProcessedStudentData[]>([]);
     const [evaluationData, setEvaluationData] = useState<CircleEvaluationData[]>([]);
     const [examData, setExamData] = useState<ProcessedExamData[]>([]);
+    const [registeredStudents, setRegisteredStudents] = useState<ProcessedRegisteredStudentData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
     const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
@@ -690,6 +703,12 @@ const App: React.FC = () => {
                 if (examSheetData && Array.isArray(examSheetData)) {
                     const processedExams = processExamData(examSheetData as RawExamData[]);
                     setExamData(processedExams);
+                }
+
+                const registeredStudentData = dataContainer.regstudent;
+                if (registeredStudentData && Array.isArray(registeredStudentData)) {
+                    const processedRegStudents = processRegisteredStudentData(registeredStudentData as RawRegisteredStudentData[]);
+                    setRegisteredStudents(processedRegStudents);
                 }
 
                 const supervisorSheetData = dataContainer['supervisor'];
@@ -1012,7 +1031,7 @@ const App: React.FC = () => {
                     <ExamPage
                         onSubmit={handlePostExam}
                         isSubmitting={isSubmitting}
-                        students={students}
+                        students={registeredStudents}
                         authenticatedUser={authenticatedUser}
                     />
                 );

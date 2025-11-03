@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { ProcessedStudentData, ExamSubmissionData } from '../types';
+import type { ProcessedRegisteredStudentData, ExamSubmissionData } from '../types';
 
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 interface ExamPageProps {
   onSubmit: (data: ExamSubmissionData) => Promise<void>;
   isSubmitting: boolean;
-  students: ProcessedStudentData[];
+  students: ProcessedRegisteredStudentData[];
   authenticatedUser: AuthenticatedUser;
 }
 
@@ -18,19 +18,13 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
   const [totalScore, setTotalScore] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const studentsForExam = useMemo(() => {
-    // بناءً على الطلب، يتم فلترة بيانات الطلاب من ورقة "report" المصدر لعرض "الأسبوع التاسع" بشكل حصري.
-    const targetWeek = "التاسع"; // FIX: Value changed from "الأسبوع التاسع" to match actual data from screenshot.
-    return students.filter(s => s.week === targetWeek);
-  }, [students]);
-
   const manageableStudents = useMemo(() => {
     if (authenticatedUser.role === 'admin') {
-      return studentsForExam;
+      return students;
     }
     const supervisorCircles = new Set(authenticatedUser.circles);
-    return studentsForExam.filter(s => supervisorCircles.has(s.circle));
-  }, [studentsForExam, authenticatedUser]);
+    return students.filter(s => supervisorCircles.has(s.circle));
+  }, [students, authenticatedUser]);
 
   const circles = useMemo(() => {
     const circleSet = new Set<string>(manageableStudents.map(s => s.circle).filter(Boolean));
@@ -40,14 +34,7 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
   const availableStudents = useMemo(() => {
     if (!selectedCircle) return [];
     const studentsInCircle = manageableStudents.filter(s => s.circle === selectedCircle);
-
-    // Deduplicate students by username to prevent duplicates in the dropdown.
-    const uniqueStudents = Array.from(
-        new Map(studentsInCircle.map(student => [student.username, student])).values()
-    );
-
-    // FIX: Add explicit types for sort callback parameters to fix type inference issue.
-    return uniqueStudents.sort((a: ProcessedStudentData, b: ProcessedStudentData) => a.studentName.localeCompare(b.studentName, 'ar'));
+    return studentsInCircle.sort((a: ProcessedRegisteredStudentData, b: ProcessedRegisteredStudentData) => a.studentName.localeCompare(b.studentName, 'ar'));
   }, [manageableStudents, selectedCircle]);
 
   useEffect(() => {
@@ -93,7 +80,6 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
         return;
     }
 
-    // FIX: Added type annotation for the parsed student data object.
     const studentData: { studentName: string; circle: string } = JSON.parse(selectedStudent);
     const finalTotalScore = finalScores.reduce((a, b) => a + b, 0);
 
@@ -120,9 +106,9 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
                  <div className="text-center mb-4">
                     <h2 className="text-2xl font-bold text-stone-800">لا توجد بيانات لعرضها</h2>
                     <p className="text-stone-500 mt-2">
-                        لم يتم العثور على طلاب مسجلين في الأسبوع التاسع.
+                        لم يتم العثور على طلاب مسجلين للاختبار.
                         <br />
-                        {authenticatedUser.role === 'supervisor' && 'قد لا يكون لديك طلاب مسجلون في هذا الأسبوع.'}
+                        {authenticatedUser.role === 'supervisor' && 'قد لا يكون لديك طلاب مسجلون تحت إشرافك.'}
                     </p>
                 </div>
             </div>
@@ -135,9 +121,6 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-stone-200">
             <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-stone-800">نموذج رصد درجات الاختبار</h2>
-                <p className="text-stone-500 mt-2 font-semibold">
-                    الأسبوع: <span className="text-amber-600">التاسع</span>
-                </p>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -153,7 +136,7 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
                         <label htmlFor="student-select" className="block text-sm font-medium text-stone-700 mb-2">الطالب</label>
                         <select id="student-select" value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} required disabled={!selectedCircle} className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md disabled:bg-stone-100">
                             <option value="">-- اختر الطالب --</option>
-                            {availableStudents.map(s => <option key={s.username} value={JSON.stringify({ studentName: s.studentName, circle: s.circle })}>{s.studentName}</option>)}
+                            {availableStudents.map(s => <option key={s.studentName} value={JSON.stringify({ studentName: s.studentName, circle: s.circle })}>{s.studentName}</option>)}
                         </select>
                     </div>
                 </div>
