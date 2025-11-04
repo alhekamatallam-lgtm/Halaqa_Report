@@ -15,6 +15,7 @@ import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
 import ExamPage from './pages/ExamPage';
 import ExamReportPage from './pages/ExamReportPage';
+import StudentFollowUpPage from './pages/StudentFollowUpPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
@@ -485,6 +486,7 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
             const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
 
             const newStudent: ProcessedStudentData = {
+                id: currentKey,
                 studentName,
                 username,
                 circle,
@@ -529,7 +531,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             .replace(/\s+/g, ' ');
     };
 
-    return data.map((item): ProcessedStudentData | null => {
+    return data.map((item, index): ProcessedStudentData | null => {
         const studentName = normalize(item["الطالب"]);
         const username = item["اسم المستخدم"];
         if (!studentName || !username) return null;
@@ -553,8 +555,11 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
         
         finalConPages.formatted = `${finalConPages.achieved.toFixed(1)} / ${finalConPages.required.toFixed(1)}`;
         finalConPages.index = finalConPages.required > 0 ? finalConPages.achieved / finalConPages.required : 0;
+        
+        const day = normalize(item["اليوم"]);
 
         return {
+            id: `${username}-${day}-${index}`,
             studentName,
             username,
             circle,
@@ -569,7 +574,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             attendance: parsePercentage(item["نسبة الحضور"]),
             totalPoints: item["اجمالي النقاط"] || 0,
             guardianMobile: normalize(item["جوال ولي الأمر"]),
-            day: normalize(item["اليوم"]),
+            day: day,
         };
     }).filter((item): item is ProcessedStudentData => item !== null);
 };
@@ -608,7 +613,7 @@ const processRegisteredStudentData = (data: RawRegisteredStudentData[]): Process
         .filter((item): item is ProcessedRegisteredStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -996,6 +1001,7 @@ const App: React.FC = () => {
         dailyCircles: 'التقرير اليومي (حلقات)',
         exam: `إدخال درجات الاختبار ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
         examReport: 'تقرير الاختبارات',
+        studentFollowUp: 'متابعة طالب',
     };
 
     const renderPage = () => {
@@ -1062,9 +1068,11 @@ const App: React.FC = () => {
             case 'supervisorAttendanceReport':
                 return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
             case 'dailyStudents':
-                return <DailyStudentReportPage students={dailyStudents} initialFilter={initialDailyStudentFilter} clearInitialFilter={() => setInitialDailyStudentFilter(null)} />;
+                return <DailyStudentReportPage students={dailyStudents} />;
             case 'dailyCircles':
                 return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
+            case 'studentFollowUp':
+                return <StudentFollowUpPage students={students} />;
             default:
                 return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
         }

@@ -26,6 +26,7 @@ export interface Achievement {
 }
 
 export interface ProcessedStudentData {
+  id: string;
   studentName: string;
   username: number;
   circle: string;

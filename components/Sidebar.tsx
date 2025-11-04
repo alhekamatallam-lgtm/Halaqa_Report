@@ -10,9 +10,10 @@ import {
     CalendarDaysIcon,
     ChevronRightIcon,
     ChevronLeftIcon,
+    StudentFollowUpIcon,
 } from './icons';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp';
 
 interface SidebarProps {
   currentPage: Page;
@@ -81,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                     <NavLink label="متابعة الحلقات (يومي)" icon={<LayoutDashboardIcon className="w-5 h-5" />} isActive={currentPage === 'dailyDashboard'} isCollapsed={isCollapsed} onClick={() => onNavigate('dailyDashboard')} />
                     <NavLink label="التقرير اليومي (حلقات)" icon={<ChartPieIcon className="w-5 h-5" />} isActive={currentPage === 'dailyCircles'} isCollapsed={isCollapsed} onClick={() => onNavigate('dailyCircles')} />
                     <NavLink label="التقرير اليومي (طلاب)" icon={<UsersIcon className="w-5 h-5" />} isActive={currentPage === 'dailyStudents'} isCollapsed={isCollapsed} onClick={() => onNavigate('dailyStudents')} />
+                    <NavLink label="متابعة طالب" icon={<StudentFollowUpIcon className="w-5 h-5" />} isActive={currentPage === 'studentFollowUp'} isCollapsed={isCollapsed} onClick={() => onNavigate('studentFollowUp')} />
                     <NavLink label="ملاحظات" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'notes'} isCollapsed={isCollapsed} onClick={() => onNavigate('notes')} />
                  </NavSection>
 

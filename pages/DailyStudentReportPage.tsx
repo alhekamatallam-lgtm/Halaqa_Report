@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ReportTable } from '../components/ReportTable';
 import StudentDetailModal from '../components/StudentDetailModal';
-import FilterControls from '../components/FilterControls';
 import type { ProcessedStudentData } from '../types';
 import { PrintIcon } from '../components/icons';
 import Pagination from '../components/Pagination';
@@ -11,139 +10,63 @@ const ITEMS_PER_PAGE = 10;
 
 interface DailyStudentReportPageProps {
   students: ProcessedStudentData[];
-  initialFilter: { circle: string } | null;
-  clearInitialFilter: () => void;
 }
 
-const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ students, initialFilter, clearInitialFilter }) => {
+const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ students }) => {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'totalPoints', direction: 'descending' });
     const [selectedStudent, setSelectedStudent] = useState<ProcessedStudentData | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-
-    // Filters state
-    const [searchQuery, setSearchQuery] = useState<string>('');
+    
+    const [selectedDay, setSelectedDay] = useState<string>('');
     const [selectedCircleTime, setSelectedCircleTime] = useState<string>('');
     const [selectedTeacher, setSelectedTeacher] = useState<string>('');
     const [selectedCircle, setSelectedCircle] = useState<string>('');
-    const [selectedDay, setSelectedDay] = useState<string>('');
+    
+    // Combined state for active filters to ensure atomic updates
+    const [activeFilters, setActiveFilters] = useState({ day: '', circle: '', teacher: '', circleTime: '' });
+
 
     useEffect(() => {
-        if (initialFilter?.circle) {
-            setSelectedCircle(initialFilter.circle);
-            const studentForCircle = students.find(s => s.circle === initialFilter.circle);
-            if (studentForCircle) {
-                setSelectedTeacher(studentForCircle.teacherName);
-                setSelectedCircleTime(studentForCircle.circleTime);
-            }
-            clearInitialFilter();
-        }
-    }, [initialFilter, clearInitialFilter, students]);
-
-     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, selectedCircleTime, selectedTeacher, selectedCircle, selectedDay]);
-
+    }, [students, activeFilters]);
 
     const dayOptions = useMemo(() => {
         const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));
         return Array.from(days).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [students]);
 
-    const studentsForFiltering = useMemo(() => {
-        if (!selectedDay) return students;
-        return students.filter(s => s.day === selectedDay);
-    }, [students, selectedDay]);
-
     const timeOptions = useMemo(() => {
-        const times = new Set<string>(studentsForFiltering.map(s => s.circleTime).filter(item => item));
+        const times = new Set<string>(students.map(s => s.circleTime).filter((t): t is string => !!t));
         return Array.from(times).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsForFiltering]);
-    
+    }, [students]);
+
     const teacherOptions = useMemo(() => {
-        const filteredStudents = selectedCircleTime
-            ? studentsForFiltering.filter(s => s.circleTime === selectedCircleTime)
-            : studentsForFiltering;
-        const teachers = new Set<string>(filteredStudents.map(s => s.teacherName).filter(item => item));
+        const teachers = new Set<string>(students.map(s => s.teacherName).filter((t): t is string => !!t));
         return Array.from(teachers).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsForFiltering, selectedCircleTime]);
+    }, [students]);
 
     const circleOptions = useMemo(() => {
-        let filteredStudents = studentsForFiltering;
-        if (selectedCircleTime) {
-            filteredStudents = filteredStudents.filter(s => s.circleTime === selectedCircleTime);
-        }
-        if (selectedTeacher) {
-            filteredStudents = filteredStudents.filter(s => s.teacherName === selectedTeacher);
-        }
-        const circles = new Set<string>(filteredStudents.map(s => s.circle).filter(item => item));
+        const circles = new Set<string>(students.map(s => s.circle).filter((c): c is string => !!c));
         return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
-    }, [studentsForFiltering, selectedCircleTime, selectedTeacher]);
+    }, [students]);
 
-    useEffect(() => {
-        if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
-            setSelectedTeacher('');
-        }
-    }, [selectedTeacher, teacherOptions]);
-
-    useEffect(() => {
-        if (selectedCircle && !circleOptions.includes(selectedCircle)) {
-            setSelectedCircle('');
-        }
-    }, [selectedCircle, circleOptions]);
-
-    useEffect(() => {
-        if (selectedCircleTime && !timeOptions.includes(selectedCircleTime)) {
-            setSelectedCircleTime('');
-        }
-    }, [selectedCircleTime, timeOptions]);
-
-    const handleFilterChange = (filterType: 'time' | 'teacher' | 'circle' | 'week', value: string) => {
-        if (filterType === 'week') { // This is our day filter
-            setSelectedDay(value);
-            setSelectedCircleTime('');
-            setSelectedTeacher('');
-            setSelectedCircle('');
-        } else if (filterType === 'time') {
-            setSelectedCircleTime(value);
-            setSelectedTeacher('');
-            setSelectedCircle('');
-        } else if (filterType === 'teacher') {
-            setSelectedTeacher(value);
-            setSelectedCircle('');
-        } else if (filterType === 'circle') {
-            setSelectedCircle(value);
-        }
-    };
-
-    const handleClearFilters = () => {
-        setSearchQuery('');
-        setSelectedCircleTime('');
-        setSelectedTeacher('');
-        setSelectedCircle('');
-        setSelectedDay('');
-    };
-
-    const { paginatedStudents, totalPages, reportTitle, summary } = useMemo(() => {
-        let filteredList = students;
-        const title = `التقرير اليومي للطلاب ${selectedDay ? `- ${selectedDay}`: ''}`;
-
-        if (selectedDay) {
-            filteredList = filteredList.filter(student => student.day === selectedDay);
-        }
-        if (searchQuery) {
-            filteredList = filteredList.filter(student =>
-                student.studentName.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-        if (selectedCircleTime) {
-            filteredList = filteredList.filter(student => student.circleTime === selectedCircleTime);
-        }
-        if (selectedTeacher) {
-            filteredList = filteredList.filter(student => student.teacherName === selectedTeacher);
-        }
-        if (selectedCircle) {
-            filteredList = filteredList.filter(student => student.circle === selectedCircle);
-        }
+    const { paginatedStudents, totalPages, reportTitle, summary, fullFilteredList } = useMemo(() => {
+        const { day: activeDayFilter, circle: activeCircleFilter, teacher: activeTeacherFilter, circleTime: activeTimeFilter } = activeFilters;
+        
+        const filteredList = students.filter(student => {
+            const dayMatch = !activeDayFilter || student.day === activeDayFilter;
+            const timeMatch = !activeTimeFilter || student.circleTime === activeTimeFilter;
+            const teacherMatch = !activeTeacherFilter || student.teacherName === activeTeacherFilter;
+            const circleMatch = !activeCircleFilter || student.circle === activeCircleFilter;
+            return dayMatch && timeMatch && teacherMatch && circleMatch;
+        });
+        
+        const titleParts = ['التقرير اليومي للطلاب'];
+        if (activeDayFilter) titleParts.push(activeDayFilter);
+        if (activeTimeFilter) titleParts.push(activeTimeFilter);
+        if (activeTeacherFilter) titleParts.push(activeTeacherFilter);
+        if (activeCircleFilter) titleParts.push(activeCircleFilter);
+        const title = titleParts.join(' - ');
 
         const sortedList = [...filteredList];
         if (sortConfig !== null) {
@@ -186,11 +109,11 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
             currentPage * ITEMS_PER_PAGE
         );
 
-        return { paginatedStudents, totalPages, reportTitle: title, summary };
-    }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedDay, currentPage]);
+        return { paginatedStudents, totalPages, reportTitle: title, summary, fullFilteredList: sortedList };
+    }, [students, sortConfig, currentPage, activeFilters]);
     
     const handlePrint = () => {
-        const studentsToPrint = paginatedStudents.filter(s => s.circleTime === 'العصر');
+        const studentsToPrint = fullFilteredList.filter(s => s.circleTime === 'العصر');
 
         const circles = studentsToPrint.reduce((acc, student) => {
             if (!acc[student.circle]) {
@@ -220,7 +143,7 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
 
         Object.keys(circles).sort((a, b) => a.localeCompare(b, 'ar')).forEach(circleName => {
             const circleData = circles[circleName];
-            const dayText = selectedDay ? `اليوم: ${selectedDay}` : `تاريخ: ${new Date().toLocaleDateString('ar-EG')}`;
+            const dayText = activeFilters.day ? `اليوم: ${activeFilters.day}` : `تاريخ: ${new Date().toLocaleDateString('ar-EG')}`;
             printContent += `
                 <div class="page-break">
                     <table class="print-table">
@@ -298,6 +221,18 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
         setSortConfig({ key, direction });
     };
 
+    const handleApplyFilter = () => {
+        setActiveFilters({ day: selectedDay, circle: selectedCircle, teacher: selectedTeacher, circleTime: selectedCircleTime });
+    };
+
+    const handleClearFilter = () => {
+        setSelectedDay('');
+        setSelectedCircleTime('');
+        setSelectedTeacher('');
+        setSelectedCircle('');
+        setActiveFilters({ day: '', circle: '', teacher: '', circleTime: '' });
+    };
+
     return (
         <>
             <div className="flex justify-end mb-4 print-hidden">
@@ -309,23 +244,92 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
                 طباعة تقارير العصر
                 </button>
             </div>
-            <FilterControls
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                allCircleTimes={timeOptions}
-                selectedCircleTime={selectedCircleTime}
-                allTeachers={teacherOptions}
-                selectedTeacher={selectedTeacher}
-                availableCircles={circleOptions}
-                selectedCircle={selectedCircle}
-                onFilterChange={handleFilterChange}
-                onClearFilters={handleClearFilters}
-                showWeekFilter={true}
-                allWeeks={dayOptions}
-                selectedWeek={selectedDay}
-                weekFilterLabel="فلترة حسب اليوم"
-                weekFilterAllOptionLabel="كل الأيام"
-            />
+
+            <div className="mb-8 bg-white p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <div className="md:col-span-1">
+                        <label htmlFor="day-filter" className="block text-sm font-medium text-stone-700 mb-2">اليوم</label>
+                        <select
+                            id="day-filter"
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                            value={selectedDay}
+                            onChange={(e) => setSelectedDay(e.target.value)}
+                        >
+                            <option value="">الكل</option>
+                            {dayOptions.map((day) => (
+                                <option key={day} value={day}>
+                                    {day}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                     <div className="md:col-span-1">
+                        <label htmlFor="time-filter" className="block text-sm font-medium text-stone-700 mb-2">الوقت</label>
+                        <select
+                            id="time-filter"
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                            value={selectedCircleTime}
+                            onChange={(e) => setSelectedCircleTime(e.target.value)}
+                        >
+                            <option value="">الكل</option>
+                            {timeOptions.map((time) => (
+                                <option key={time} value={time}>
+                                    {time}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                     <div className="md:col-span-1">
+                        <label htmlFor="teacher-filter" className="block text-sm font-medium text-stone-700 mb-2">المعلم</label>
+                        <select
+                            id="teacher-filter"
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                            value={selectedTeacher}
+                            onChange={(e) => setSelectedTeacher(e.target.value)}
+                        >
+                            <option value="">الكل</option>
+                            {teacherOptions.map((teacher) => (
+                                <option key={teacher} value={teacher}>
+                                    {teacher}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="md:col-span-1">
+                        <label htmlFor="circle-filter" className="block text-sm font-medium text-stone-700 mb-2">الحلقة</label>
+                        <select
+                            id="circle-filter"
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                            value={selectedCircle}
+                            onChange={(e) => setSelectedCircle(e.target.value)}
+                        >
+                            <option value="">الكل</option>
+                            {circleOptions.map((circle) => (
+                                <option key={circle} value={circle}>
+                                    {circle}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="md:col-span-1">
+                        <button
+                            onClick={handleApplyFilter}
+                            className="w-full h-10 px-4 text-sm font-semibold text-white bg-amber-500 rounded-md shadow-sm hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all duration-150"
+                        >
+                            تطبيق الفلتر
+                        </button>
+                    </div>
+                    <div className="md:col-span-1">
+                        <button
+                            onClick={handleClearFilter}
+                            className="w-full h-10 px-4 text-sm font-semibold text-stone-700 bg-stone-200 rounded-md shadow-sm hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-400 transition-all duration-150"
+                        >
+                            مسح الفلتر
+                        </button>
+                    </div>
+                </div>
+            </div>
+
              <div className="mb-4">
                 <h4 className="text-lg font-semibold text-stone-700">{reportTitle}</h4>
             </div>

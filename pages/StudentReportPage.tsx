@@ -206,6 +206,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
 
                 return {
                     ...latestRow,
+                    id: `agg-${latestRow.username}`,
                     memorizationLessons: agg.memorizationLessons.join(', '),
                     memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
                     reviewLessons: agg.reviewLessons.join(', '),
