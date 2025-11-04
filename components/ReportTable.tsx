@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import type { ProcessedStudentData } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -87,7 +86,7 @@ export const ReportTable: React.FC<ReportTableProps> = ({ students, onRowClick, 
         <tbody className="bg-white divide-y divide-stone-200">
           {students.map((student, index) => (
             <tr 
-              key={student.id} 
+              key={student.username} 
               className={`transition-all duration-200 cursor-pointer 
                 ${student.hasMultipleEntries 
                   ? 'bg-amber-100/50 hover:bg-amber-100 ring-1 ring-amber-300' 

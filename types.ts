@@ -26,7 +26,6 @@ export interface Achievement {
 }
 
 export interface ProcessedStudentData {
-  id: string;
   studentName: string;
   username: number;
   circle: string;
@@ -142,6 +141,7 @@ export interface ProcessedExamData {
     q2: number;
     q3: number;
     q4: number;
+    // FIX: Added missing property q5 to align with data processing logic.
     q5: number;
     totalScore: number;
 }
@@ -173,7 +173,7 @@ export interface TeacherDailyAttendance {
   teacherName: string;
   checkIn: Date | null;
   checkOut: Date | null;
-  status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور';
+  status: 'لم يحضر' | 'حاضر' | 'حضور متأخر' | 'انصراف مبكر' | 'مكتمل الحضور';
 }
 
 export interface TeacherAttendanceReportEntry {

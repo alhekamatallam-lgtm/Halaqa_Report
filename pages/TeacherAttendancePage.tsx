@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { TeacherDailyAttendance, TeacherInfo } from '../types';
 import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
 
@@ -13,6 +13,7 @@ interface TeacherAttendancePageProps {
 const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher }) => {
     
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const handleFullscreenChange = () => {
         const isCurrentlyFullscreen = !!document.fullscreenElement;
@@ -43,6 +44,16 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
             }
         }
     };
+    
+    const filteredTeachers = useMemo(() => {
+        if (!searchQuery) {
+            return allTeachers;
+        }
+        return allTeachers.filter(teacher =>
+            teacher.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [allTeachers, searchQuery]);
+
 
     const statusMap: Map<string, TeacherDailyAttendance> = new Map(attendanceStatus.map(s => [s.teacherName, s]));
 
@@ -76,91 +87,127 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                     </button>
                 </div>
             </div>
+
+            <div className="mb-6 max-w-lg mx-auto">
+                <label htmlFor="teacher-search" className="sr-only">بحث عن معلم</label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        id="teacher-search"
+                        className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                        placeholder="ابحث عن اسم المعلم..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-                {allTeachers.map(teacher => {
-                    const teacherName = teacher.name;
-                    const statusInfo = statusMap.get(teacherName);
-                    const isThisTeacherSubmitting = submittingTeacher === teacherName;
+                {filteredTeachers.length > 0 ? (
+                    filteredTeachers.map(teacher => {
+                        const teacherName = teacher.name;
+                        const statusInfo = statusMap.get(teacherName);
+                        const isThisTeacherSubmitting = submittingTeacher === teacherName;
 
-                    let statusText = 'لم يحضر';
-                    let statusColor = 'bg-yellow-500';
-                    let borderColor = 'border-yellow-500';
-                    
-                    if (isThisTeacherSubmitting) {
-                        statusText = 'جاري التحديث...';
-                        statusColor = 'bg-indigo-500 animate-pulse';
-                        borderColor = 'border-indigo-500';
-                    } else if (statusInfo) {
-                        switch(statusInfo.status) {
-                            case 'حاضر':
-                                statusText = 'حاضر';
-                                statusColor = 'bg-green-500';
-                                borderColor = 'border-green-500';
-                                break;
-                            case 'مكتمل الحضور':
-                                statusText = 'مكتمل الحضور';
-                                statusColor = 'bg-blue-600';
-                                borderColor = 'border-blue-600';
-                                break;
-                            default:
-                                break;
+                        let statusText = 'لم يحضر';
+                        let statusColor = 'bg-yellow-500';
+                        let borderColor = 'border-yellow-500';
+                        
+                        if (isThisTeacherSubmitting) {
+                            statusText = 'جاري التحديث...';
+                            statusColor = 'bg-indigo-500 animate-pulse';
+                            borderColor = 'border-indigo-500';
+                        } else if (statusInfo) {
+                            switch(statusInfo.status) {
+                                case 'حاضر':
+                                    statusText = 'حاضر';
+                                    statusColor = 'bg-green-500';
+                                    borderColor = 'border-green-500';
+                                    break;
+                                case 'حضور متأخر':
+                                    statusText = 'حضور متأخر';
+                                    statusColor = 'bg-orange-500';
+                                    borderColor = 'border-orange-500';
+                                    break;
+                                case 'انصراف مبكر':
+                                    statusText = 'انصراف مبكر';
+                                    statusColor = 'bg-purple-500';
+                                    borderColor = 'border-purple-500';
+                                    break;
+                                case 'مكتمل الحضور':
+                                    statusText = 'مكتمل الحضور';
+                                    statusColor = 'bg-blue-600';
+                                    borderColor = 'border-blue-600';
+                                    break;
+                                default:
+                                    break;
+                            }
                         }
-                    }
 
-                    const timeFormatOptions: Intl.DateTimeFormatOptions = {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false,
-                        timeZone: 'Asia/Riyadh'
-                    };
+                        const timeFormatOptions: Intl.DateTimeFormatOptions = {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false,
+                            timeZone: 'Asia/Riyadh'
+                        };
 
-                    const checkInTime = statusInfo?.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkIn) : '';
-                    const checkOutTime = statusInfo?.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkOut) : '';
-                    
-                    const canCheckIn = !statusInfo?.checkIn;
-                    const canCheckOut = !!statusInfo?.checkIn && !statusInfo?.checkOut;
+                        const checkInTime = statusInfo?.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkIn) : '';
+                        const checkOutTime = statusInfo?.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkOut) : '';
+                        
+                        const canCheckIn = !statusInfo?.checkIn;
+                        const canCheckOut = !!statusInfo?.checkIn && !statusInfo?.checkOut;
 
-                    return (
-                        <div key={teacherName} className={`bg-stone-50 p-4 rounded-xl shadow-lg border-l-4 ${borderColor} transition-all hover:shadow-xl hover:border-amber-500 flex flex-col justify-between`}>
-                            <div>
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <h3 className="font-semibold text-stone-800 text-lg">{teacherName}</h3>
-                                        <p className="text-sm text-stone-500">{teacher.circle}</p>
+                        return (
+                            <div key={teacherName} className={`bg-stone-50 p-4 rounded-xl shadow-lg border-l-4 ${borderColor} transition-all hover:shadow-xl hover:border-amber-500 flex flex-col justify-between`}>
+                                <div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h3 className="font-semibold text-stone-800 text-lg">{teacherName}</h3>
+                                            <p className="text-sm text-stone-500">{teacher.circle}</p>
+                                        </div>
+                                        <span className={`px-2 py-1 text-xs font-bold text-white rounded-full ${statusColor}`}>{statusText}</span>
                                     </div>
-                                    <span className={`px-2 py-1 text-xs font-bold text-white rounded-full ${statusColor}`}>{statusText}</span>
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                    <div className="w-full flex flex-col">
+                                        <div className="text-center text-xs text-stone-500 mb-1 h-4 font-mono">
+                                            {checkInTime}
+                                        </div>
+                                        <button 
+                                            onClick={() => onSubmit(teacherName, 'حضور')}
+                                            disabled={!canCheckIn || isSubmitting}
+                                            className="w-full h-10 px-4 text-sm font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
+                                        >
+                                            تسجيل حضور
+                                        </button>
+                                    </div>
+                                    <div className="w-full flex flex-col">
+                                        <div className="text-center text-xs text-stone-500 mb-1 h-4 font-mono">
+                                            {checkOutTime}
+                                        </div>
+                                        <button 
+                                            onClick={() => onSubmit(teacherName, 'انصراف')}
+                                            disabled={!canCheckOut || isSubmitting}
+                                            className="w-full h-10 px-4 text-sm font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
+                                        >
+                                            تسجيل انصراف
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex gap-2 mt-4">
-                                <div className="w-full flex flex-col">
-                                    <div className="text-center text-xs text-stone-500 mb-1 h-4 font-mono">
-                                        {checkInTime}
-                                    </div>
-                                    <button 
-                                        onClick={() => onSubmit(teacherName, 'حضور')}
-                                        disabled={!canCheckIn || isSubmitting}
-                                        className="w-full h-10 px-4 text-sm font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
-                                    >
-                                        تسجيل حضور
-                                    </button>
-                                </div>
-                                <div className="w-full flex flex-col">
-                                     <div className="text-center text-xs text-stone-500 mb-1 h-4 font-mono">
-                                        {checkOutTime}
-                                    </div>
-                                    <button 
-                                        onClick={() => onSubmit(teacherName, 'انصراف')}
-                                        disabled={!canCheckOut || isSubmitting}
-                                        className="w-full h-10 px-4 text-sm font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
-                                    >
-                                        تسجيل انصراف
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                ) : (
+                    <div className="col-span-full text-center py-12 text-stone-600">
+                        <p>لم يتم العثور على معلم يطابق بحثك.</p>
+                    </div>
+                )}
             </div>
         </div>
     );

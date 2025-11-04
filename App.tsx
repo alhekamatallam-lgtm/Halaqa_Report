@@ -15,7 +15,6 @@ import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
 import ExamPage from './pages/ExamPage';
 import ExamReportPage from './pages/ExamReportPage';
-import StudentFollowUpPage from './pages/StudentFollowUpPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
@@ -138,11 +137,26 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
     });
 
     return Array.from(teacherRecords.entries()).map(([teacherName, times]) => {
-        let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
+        let status: TeacherDailyAttendance['status'] = 'لم يحضر';
+
+        const lateThreshold = new Date(todayRiyadh);
+        lateThreshold.setHours(15, 30, 0, 0); // 3:30 PM
+
+        const earlyThreshold = new Date(todayRiyadh);
+        earlyThreshold.setHours(16, 50, 0, 0); // 4:50 PM
+
         if (times.checkIn && times.checkOut) {
-            status = 'مكتمل الحضور';
+            if (times.checkOut < earlyThreshold) {
+                status = 'انصراف مبكر';
+            } else {
+                status = 'مكتمل الحضور';
+            }
         } else if (times.checkIn) {
-            status = 'حاضر';
+            if (times.checkIn > lateThreshold) {
+                status = 'حضور متأخر';
+            } else {
+                status = 'حاضر';
+            }
         }
         
         return {
@@ -486,7 +500,6 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
             const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
 
             const newStudent: ProcessedStudentData = {
-                id: currentKey,
                 studentName,
                 username,
                 circle,
@@ -531,7 +544,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             .replace(/\s+/g, ' ');
     };
 
-    return data.map((item, index): ProcessedStudentData | null => {
+    return data.map((item): ProcessedStudentData | null => {
         const studentName = normalize(item["الطالب"]);
         const username = item["اسم المستخدم"];
         if (!studentName || !username) return null;
@@ -555,11 +568,8 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
         
         finalConPages.formatted = `${finalConPages.achieved.toFixed(1)} / ${finalConPages.required.toFixed(1)}`;
         finalConPages.index = finalConPages.required > 0 ? finalConPages.achieved / finalConPages.required : 0;
-        
-        const day = normalize(item["اليوم"]);
 
         return {
-            id: `${username}-${day}-${index}`,
             studentName,
             username,
             circle,
@@ -574,7 +584,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             attendance: parsePercentage(item["نسبة الحضور"]),
             totalPoints: item["اجمالي النقاط"] || 0,
             guardianMobile: normalize(item["جوال ولي الأمر"]),
-            day: day,
+            day: normalize(item["اليوم"]),
         };
     }).filter((item): item is ProcessedStudentData => item !== null);
 };
@@ -613,7 +623,7 @@ const processRegisteredStudentData = (data: RawRegisteredStudentData[]): Process
         .filter((item): item is ProcessedRegisteredStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -851,25 +861,48 @@ const App: React.FC = () => {
 
         const updatedTeacher = { ...teacherAttendance[teacherIndex] };
         const now = new Date();
+        const timeZone = 'Asia/Riyadh';
+        const nowRiyadh = new Date(now.toLocaleString('en-US', { timeZone }));
+
+        const payload: {
+            sheet: string;
+            name: string;
+            status: 'حضور' | 'انصراف';
+            time: string;
+            ملاحظات: string;
+        } = {
+            sheet: 'attandance',
+            "name": teacherName,
+            "status": action,
+            "time": now.toISOString(),
+            "ملاحظات": "",
+        };
 
         if (action === 'حضور') {
             updatedTeacher.checkIn = now;
-            updatedTeacher.status = 'حاضر';
-        } else {
+            const lateThreshold = new Date(nowRiyadh);
+            lateThreshold.setHours(15, 30, 0, 0); // 3:30 PM
+            if (nowRiyadh > lateThreshold) {
+                payload.ملاحظات = 'حضور متأخر';
+                updatedTeacher.status = 'حضور متأخر';
+            } else {
+                updatedTeacher.status = 'حاضر';
+            }
+        } else { // 'انصراف'
             updatedTeacher.checkOut = now;
-            updatedTeacher.status = 'مكتمل الحضور';
+            const earlyThreshold = new Date(nowRiyadh);
+            earlyThreshold.setHours(16, 50, 0, 0); // 4:50 PM
+            if (nowRiyadh < earlyThreshold) {
+                payload.ملاحظات = 'انصراف مبكر';
+                updatedTeacher.status = 'انصراف مبكر';
+            } else {
+                updatedTeacher.status = 'مكتمل الحضور';
+            }
         }
 
         const newAttendance = [...teacherAttendance];
         newAttendance[teacherIndex] = updatedTeacher;
         setTeacherAttendance(newAttendance);
-
-        const payload = {
-            sheet: 'attandance',
-            "name": teacherName,
-            "status": action,
-            "time": now.toISOString(),
-        };
 
         try {
             await fetch(API_URL, {
@@ -884,7 +917,8 @@ const App: React.FC = () => {
                 setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
             } else {
                 console.error("فشل في تسجيل الحضور:", err);
-                setNotification({ message: 'فشل في تسجيل الحضور. الرجاء التحقق من اتصالك.', type: 'error' });
+                setNotification({ message: 'فشل في تسجيل الحضور. حاول مرة أخرى.', type: 'error' });
+                // Revert optimistic update
                 setTeacherAttendance(originalAttendance);
             }
         } finally {
@@ -912,11 +946,11 @@ const App: React.FC = () => {
         if (action === 'حضور') {
             updatedSupervisor.checkIn = now;
             updatedSupervisor.status = 'حاضر';
-        } else {
+        } else { // انصراف
             updatedSupervisor.checkOut = now;
             updatedSupervisor.status = 'مكتمل الحضور';
         }
-
+        
         const newAttendance = [...supervisorAttendance];
         newAttendance[supervisorIndex] = updatedSupervisor;
         setSupervisorAttendance(newAttendance);
@@ -940,8 +974,9 @@ const App: React.FC = () => {
                 console.log('Fetch error (supervisor attendance), likely redirect. Assuming success.');
                 setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
             } else {
-                console.error("فشل في تسجيل حضور المشرف:", err);
-                setNotification({ message: 'فشل في تسجيل الحضور. الرجاء التحقق من اتصالك.', type: 'error' });
+                console.error("فشل في تسجيل الحضور:", err);
+                setNotification({ message: 'فشل في تسجيل الحضور. حاول مرة أخرى.', type: 'error' });
+                // Revert optimistic update
                 setSupervisorAttendance(originalAttendance);
             }
         } finally {
@@ -949,188 +984,120 @@ const App: React.FC = () => {
             setSubmittingSupervisor(null);
         }
     };
+    
+    const allSupervisorsInfo: SupervisorInfo[] = useMemo(() => {
+        return supervisors.map(s => ({ name: s.supervisorName })).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+    }, [supervisors]);
 
-    const handleNavigation = (page: Page) => {
-        setInitialStudentFilter(null);
-        if ((page === 'evaluation' || page === 'exam') && !authenticatedUser) {
-            setCurrentPage(page);
+    const handleNavigate = (page: Page) => {
+        if ((page === 'evaluation' || page === 'exam' || page === 'supervisorAttendance' ) && !authenticatedUser) {
             setShowPasswordModal(true);
         } else {
             setCurrentPage(page);
-            setShowPasswordModal(false);
         }
     };
-
+    
+    const handleLoginSuccess = (user: AuthenticatedUser) => {
+        setAuthenticatedUser(user);
+        setShowPasswordModal(false);
+        if (user.role === 'admin') {
+           setCurrentPage('evaluation'); // Or any other protected page
+        } else { // Supervisor
+           setCurrentPage('evaluation');
+        }
+    };
+    
     const handleCircleSelect = (circleName: string) => {
         setInitialStudentFilter({ circle: circleName });
         setCurrentPage('students');
     };
-
     const handleDailyCircleSelect = (circleName: string) => {
         setInitialDailyStudentFilter({ circle: circleName });
         setCurrentPage('dailyStudents');
     };
     
+    let content;
     if (isLoading) {
-        return (
-            <div className="flex flex-col justify-center items-center h-screen bg-stone-50">
-                <img src={LOGO_URL} alt="شعار المجمع" className="w-40 h-40 animate-pulse mb-4" />
-                <p className="text-stone-600 font-semibold">...جاري تحميل البيانات</p>
-            </div>
-        );
-    }
-    
-    if (error) {
-        return <div className="flex justify-center items-center h-screen text-lg text-red-600 bg-red-50 p-4"><p>فشل تحميل البيانات: {error}</p></div>;
-    }
-
-    const titles = {
-        students: 'تقرير الطلاب',
-        circles: 'تقرير الحلقات',
-        general: 'التقرير العام',
-        dashboard: 'متابعة الحلقات',
-        dailyDashboard: 'متابعة الحلقات (يومي)',
-        notes: 'ملاحظات الطلاب',
-        evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
-        excellence: 'تميز الحلقات',
-        teacherAttendance: 'حضور وانصراف المعلمين',
-        teacherAttendanceReport: 'تقرير حضور المعلمين',
-        supervisorAttendance: 'حضور المشرفين',
-        supervisorAttendanceReport: 'تقرير حضور المشرفين',
-        dailyStudents: 'التقرير اليومي (طلاب)',
-        dailyCircles: 'التقرير اليومي (حلقات)',
-        exam: `إدخال درجات الاختبار ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
-        examReport: 'تقرير الاختبارات',
-        studentFollowUp: 'متابعة طالب',
-    };
-
-    const renderPage = () => {
+        content = <div className="flex justify-center items-center h-full"><div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-amber-500"></div></div>;
+    } else if (error) {
+        content = <div className="text-center p-8 bg-red-100 text-red-800 rounded-lg">{error}</div>;
+    } else {
         switch (currentPage) {
             case 'students':
-                return <StudentReportPage students={students} initialFilter={initialStudentFilter} clearInitialFilter={() => setInitialStudentFilter(null)} />;
-            case 'circles':
-                return <CircleReportPage students={students} supervisors={supervisors} />;
-            case 'general':
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
-            case 'dashboard':
-                return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
-            case 'dailyDashboard':
-                return <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
-            case 'notes':
-                return <NotesPage students={students} />;
-            case 'excellence':
-                return <ExcellencePage students={students} supervisors={supervisors} />;
-            case 'evaluation':
-                 if (!authenticatedUser) return null;
-                return (
-                    <EvaluationPage
-                        onSubmit={handlePostEvaluation}
-                        isSubmitting={isSubmitting}
-                        evaluationData={evaluationData}
-                        students={students}
-                        authenticatedUser={authenticatedUser}
-                    />
-                );
-            case 'exam':
-                 if (!authenticatedUser) return null;
-                return (
-                    <ExamPage
-                        onSubmit={handlePostExam}
-                        isSubmitting={isSubmitting}
-                        students={registeredStudents}
-                        authenticatedUser={authenticatedUser}
-                    />
-                );
-            case 'examReport':
-                return <ExamReportPage examData={examData} />;
-            case 'teacherAttendance':
-                return (
-                    <TeacherAttendancePage 
-                        allTeachers={asrTeachersInfo}
-                        attendanceStatus={teacherAttendance}
-                        onSubmit={handlePostTeacherAttendance}
-                        isSubmitting={isSubmitting}
-                        submittingTeacher={submittingTeacher}
-                    />
-                );
-            case 'teacherAttendanceReport':
-                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
-            case 'supervisorAttendance':
-                return (
-                    <SupervisorAttendancePage
-                        allSupervisors={supervisors.map(s => ({ name: s.supervisorName }))}
-                        attendanceStatus={supervisorAttendance}
-                        onSubmit={handlePostSupervisorAttendance}
-                        isSubmitting={isSubmitting}
-                        submittingSupervisor={submittingSupervisor}
-                    />
-                );
-            case 'supervisorAttendanceReport':
-                return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
+                content = <StudentReportPage students={students} initialFilter={initialStudentFilter} clearInitialFilter={() => setInitialStudentFilter(null)} />;
+                break;
             case 'dailyStudents':
-                return <DailyStudentReportPage students={dailyStudents} />;
+                content = <DailyStudentReportPage students={dailyStudents} initialFilter={initialDailyStudentFilter} clearInitialFilter={() => setInitialDailyStudentFilter(null)} />;
+                break;
+            case 'circles':
+                content = <CircleReportPage students={students} supervisors={supervisors} />;
+                break;
             case 'dailyCircles':
-                return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
-            case 'studentFollowUp':
-                return <StudentFollowUpPage students={students} />;
+                content = <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
+                break;
+            case 'general':
+                content = <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
+                break;
+            case 'dashboard':
+                content = <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
+                break;
+            case 'dailyDashboard':
+                content = <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
+                break;
+            case 'notes':
+                content = <NotesPage students={students} />;
+                break;
+            case 'excellence':
+                content = <ExcellencePage students={students} supervisors={supervisors} />;
+                break;
+            case 'evaluation':
+                content = authenticatedUser ? <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} evaluationData={evaluationData} students={students} authenticatedUser={authenticatedUser} /> : null;
+                break;
+            case 'exam':
+                content = authenticatedUser ? <ExamPage onSubmit={handlePostExam} isSubmitting={isSubmitting} students={registeredStudents} authenticatedUser={authenticatedUser} /> : null;
+                break;
+            case 'examReport':
+                content = <ExamReportPage examData={examData} />;
+                break;
+            case 'teacherAttendance':
+                content = <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} />;
+                break;
+            case 'teacherAttendanceReport':
+                content = <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+                break;
+            case 'supervisorAttendance':
+                content = authenticatedUser ? <SupervisorAttendancePage allSupervisors={allSupervisorsInfo} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} /> : null;
+                break;
+            case 'supervisorAttendanceReport':
+                content = <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
+                break;
             default:
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
+                content = <div>Page not found</div>;
         }
-    };
+    }
 
     return (
-        <div className="flex h-screen bg-stone-100 text-stone-800 font-sans">
-            <Notification notification={notification} onClose={() => setNotification(null)} />
-            
-            <Sidebar 
-                currentPage={currentPage} 
-                onNavigate={handleNavigation}
-                isCollapsed={isSidebarCollapsed}
-                onToggle={() => setIsSidebarCollapsed(prev => !prev)}
-            />
-
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="bg-white/80 backdrop-blur-sm shadow-md z-10 print-hidden border-b border-stone-200">
-                    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between py-2">
-                            <div className="flex items-center gap-3">
-                                <img src={LOGO_URL} alt="شعار المجمع" className="h-14 md:h-16" />
-                                <div className='hidden sm:block'>
-                                    <h2 className="text-lg font-semibold text-stone-600">مجمع الراجحي بشبرا</h2>
-                                    <p className="text-sm text-stone-500">نظام متابعة أداء الحلقات</p>
-                                </div>
-                            </div>
-                            <div className="text-center flex-grow">
-                                <h1 className="text-xl sm:text-2xl font-bold leading-tight text-stone-800">
-                                    {titles[currentPage]}
-                                </h1>
-                            </div>
-                            <div className="w-24 sm:w-48"> {/* Spacer to help center the title */}
-                            </div>
+        <div className="flex h-screen bg-stone-100 text-stone-800">
+             {showPasswordModal && <PasswordModal supervisors={supervisors} onSuccess={handleLoginSuccess} onClose={() => setShowPasswordModal(false)} />}
+             <Notification notification={notification} onClose={() => setNotification(null)} />
+             <Sidebar currentPage={currentPage} onNavigate={handleNavigate} isCollapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
+             <div className="flex-1 flex flex-col overflow-hidden">
+                <header className="bg-white/80 backdrop-blur-sm shadow-md print-hidden h-24 flex items-center justify-between px-8 border-b border-stone-200">
+                    <div>
+                         <h1 className="text-2xl font-bold text-stone-800">تقرير الحلقة التفاعلي</h1>
+                         <p className="text-sm text-stone-500">مجمع الراجحي بشبرا</p>
+                    </div>
+                    {authenticatedUser && (
+                        <div className="text-left">
+                            <p className="font-semibold text-stone-700">مرحباً, {authenticatedUser.name}</p>
+                            <button onClick={() => setAuthenticatedUser(null)} className="text-sm text-red-600 hover:underline">تسجيل الخروج</button>
                         </div>
-                    </div>
+                    )}
                 </header>
-                
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                    <div className="animate-slide-in">
-                        {renderPage()}
-                    </div>
+                <main className="flex-1 overflow-x-hidden overflow-y-auto p-8">
+                    {content}
                 </main>
-            </div>
-
-            {showPasswordModal && (
-                <PasswordModal
-                    supervisors={supervisors}
-                    onSuccess={(user) => {
-                        setAuthenticatedUser(user);
-                        setShowPasswordModal(false);
-                        if (currentPage !== 'evaluation' && currentPage !== 'exam') {
-                             setCurrentPage(currentPage); // Stay on current page if it's not eval/exam
-                        }
-                    }}
-                    onClose={() => setShowPasswordModal(false)}
-                />
-            )}
+             </div>
         </div>
     );
 };
