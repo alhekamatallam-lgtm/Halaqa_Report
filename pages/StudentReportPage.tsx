@@ -3,7 +3,7 @@ import { ReportTable } from '../components/ReportTable';
 import StudentDetailModal from '../components/StudentDetailModal';
 import FilterControls from '../components/FilterControls';
 import type { ProcessedStudentData, Achievement } from '../types';
-import { PrintIcon } from '../components/icons';
+import { PrintIcon, ExcelIcon } from '../components/icons';
 import Pagination from '../components/Pagination';
 
 type SortKey = keyof ProcessedStudentData;
@@ -134,7 +134,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         setSelectedWeek('');
     };
 
-    const { filteredStudents, totalPages, reportTitle, summary } = useMemo(() => {
+    const { filteredStudents, totalPages, reportTitle, summary, fullFilteredList } = useMemo(() => {
         // Step 1: Prepare the base data (either aggregated or for a specific week)
         let dataToFilter: ProcessedStudentData[];
         let title: string;
@@ -206,6 +206,7 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
 
                 return {
                     ...latestRow,
+                    id: `agg-${latestRow.username}`,
                     memorizationLessons: agg.memorizationLessons.join(', '),
                     memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
                     reviewLessons: agg.reviewLessons.join(', '),
@@ -281,11 +282,11 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
             currentPage * ITEMS_PER_PAGE
         );
 
-        return { filteredStudents: paginatedList, totalPages, reportTitle: title, summary };
+        return { filteredStudents: paginatedList, totalPages, reportTitle: title, summary, fullFilteredList: sortedList };
     }, [students, sortConfig, selectedCircleTime, selectedTeacher, selectedCircle, searchQuery, selectedWeek, currentPage]);
     
     const handlePrint = () => {
-        const studentsToPrint = filteredStudents.filter(s => s.circleTime === 'العصر');
+        const studentsToPrint = fullFilteredList.filter(s => s.circleTime === 'العصر');
 
         const circles = studentsToPrint.reduce((acc, student) => {
             if (!acc[student.circle]) {
@@ -387,6 +388,32 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
         document.body.removeChild(printContainer);
     };
 
+    const handleExport = () => {
+        // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
+        const XLSX = (window as any).XLSX;
+        const dataToExport = fullFilteredList.map(student => ({
+          'اسم الطالب': student.studentName,
+          'الحلقة': student.circle,
+          'المعلم': student.teacherName,
+          'أوجه الحفظ المحققة': student.memorizationPages.achieved,
+          'أوجه الحفظ المطلوبة': student.memorizationPages.required,
+          'مؤشر الحفظ': `${(student.memorizationPages.index * 100).toFixed(0)}%`,
+          'أوجه المراجعة المحققة': student.reviewPages.achieved,
+          'أوجه المراجعة المطلوبة': student.reviewPages.required,
+          'مؤشر المراجعة': `${(student.reviewPages.index * 100).toFixed(0)}%`,
+          'أوجه التثبيت المحققة': student.consolidationPages.achieved,
+          'أوجه التثبيت المطلوبة': student.consolidationPages.required,
+          'مؤشر التثبيت': `${(student.consolidationPages.index * 100).toFixed(0)}%`,
+          'نسبة الحضور': `${(student.attendance * 100).toFixed(0)}%`,
+          'النقاط': student.totalPoints,
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'تقرير الطلاب');
+        XLSX.writeFile(wb, 'تقرير_الطلاب.xlsx');
+    };
+
     const handleSort = (key: SortKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
         if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -397,7 +424,14 @@ const StudentReportPage: React.FC<StudentReportPageProps> = ({ students, initial
 
     return (
         <>
-            <div className="flex justify-end mb-4 print-hidden">
+            <div className="flex justify-end mb-4 print-hidden gap-2">
+                 <button
+                    onClick={handleExport}
+                    className="px-4 py-2 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2"
+                >
+                    <ExcelIcon />
+                    تصدير لإكسل
+                </button>
                 <button
                 onClick={handlePrint}
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"

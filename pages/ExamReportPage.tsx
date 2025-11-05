@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { ProcessedExamData } from '../types';
 import ExamReportTable from '../components/ExamReportTable';
 import Pagination from '../components/Pagination';
-import { UsersIcon, ClipboardListIcon } from '../components/icons';
+import { UsersIcon, ClipboardListIcon, ExcelIcon } from '../components/icons';
 
 type SortKey = keyof ProcessedExamData;
 const ITEMS_PER_PAGE = 15;
@@ -37,7 +37,7 @@ const ExamReportPage: React.FC<ExamReportPageProps> = ({ examData }) => {
         return Array.from(circleSet).sort((a, b) => a.localeCompare(b, 'ar'));
     }, [examData]);
     
-    const { paginatedExams, totalPages, stats } = useMemo(() => {
+    const { paginatedExams, totalPages, stats, fullExamList } = useMemo(() => {
         let filteredData = examData;
 
         if (searchStudent) {
@@ -77,7 +77,7 @@ const ExamReportPage: React.FC<ExamReportPageProps> = ({ examData }) => {
             currentPage * ITEMS_PER_PAGE
         );
 
-        return { paginatedExams: paginated, totalPages: total, stats: currentStats };
+        return { paginatedExams: paginated, totalPages: total, stats: currentStats, fullExamList: sortedList };
     }, [examData, sortConfig, currentPage, searchStudent, searchExam, selectedCircle]);
 
     const handleSort = (key: SortKey) => {
@@ -96,6 +96,27 @@ const ExamReportPage: React.FC<ExamReportPageProps> = ({ examData }) => {
         setCurrentPage(1);
     };
 
+    const handleExport = () => {
+        // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
+        const XLSX = (window as any).XLSX;
+        const dataToExport = fullExamList.map(exam => ({
+          'الطالب': exam.studentName,
+          'الحلقة': exam.circle,
+          'الاختبار': exam.examName,
+          'السؤال الأول': exam.q1,
+          'السؤال الثاني': exam.q2,
+          'السؤال الثالث': exam.q3,
+          'السؤال الرابع': exam.q4,
+          'السؤال الخامس': exam.q5,
+          'الإجمالي': exam.totalScore,
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'تقرير الاختبارات');
+        XLSX.writeFile(wb, 'تقرير_الاختبارات.xlsx');
+    };
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -104,25 +125,30 @@ const ExamReportPage: React.FC<ExamReportPageProps> = ({ examData }) => {
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-200">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div className="md:col-span-1">
                         <label htmlFor="search-student" className="block text-sm font-medium text-stone-700 mb-2">بحث بالطالب</label>
                         <input type="text" id="search-student" value={searchStudent} onChange={e => setSearchStudent(e.target.value)} placeholder="ادخل اسم الطالب..." className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
                     </div>
-                     <div>
+                     <div className="md:col-span-1">
                         <label htmlFor="search-exam" className="block text-sm font-medium text-stone-700 mb-2">بحث بالاختبار</label>
                         <input type="text" id="search-exam" value={searchExam} onChange={e => setSearchExam(e.target.value)} placeholder="ادخل اسم الاختبار..." className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
                     </div>
-                     <div>
+                     <div className="md:col-span-1">
                         <label htmlFor="circle-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة حسب الحلقة</label>
                         <select id="circle-filter" value={selectedCircle} onChange={e => setSelectedCircle(e.target.value)} className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md">
                             <option value="">كل الحلقات</option>
                             {circles.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
-                    <div>
+                    <div className="md:col-span-1">
                         <button onClick={handleClearFilters} className="w-full h-10 px-4 text-sm font-semibold text-stone-700 bg-stone-200 rounded-md shadow-sm hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-400 transition-all">
                             مسح الفلتر
+                        </button>
+                    </div>
+                     <div className="md:col-span-1">
+                        <button onClick={handleExport} className="w-full h-10 px-4 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2">
+                           <ExcelIcon /> تصدير لإكسل
                         </button>
                     </div>
                 </div>

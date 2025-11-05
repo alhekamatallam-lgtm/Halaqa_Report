@@ -1,9 +1,7 @@
-
-
 import React from 'react';
 import type { SupervisorAttendanceReportEntry, SupervisorAttendanceSummaryEntry } from '../types';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
-import { PrintIcon } from '../components/icons';
+import { PrintIcon, ExcelIcon } from '../components/icons';
 import { ProgressBar } from '../components/ProgressBar';
 import Pagination from '../components/Pagination';
 
@@ -121,6 +119,39 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
     setModalData({ title, dates });
   };
 
+  const handleExport = () => {
+    // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
+    const XLSX = (window as any).XLSX;
+    let dataToExport;
+    let fileName;
+    let sheetName;
+
+    if (activeTab === 'detailed') {
+      dataToExport = filteredData.map(item => ({
+        'اسم المشرف': item.supervisorName,
+        'التاريخ': new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC' }),
+        'وقت الحضور': item.checkInTime || 'غائب',
+        'وقت الانصراف': item.checkOutTime || '',
+      }));
+      fileName = 'تقرير_حضور_المشرفين_التفصيلي.xlsx';
+      sheetName = 'التقرير التفصيلي';
+    } else { // summary
+      dataToExport = summaryData.map(item => ({
+        'اسم المشرف': item.supervisorName,
+        'أيام الحضور': item.presentDays,
+        'أيام الغياب': item.absentDays,
+        'نسبة الحضور': `${(item.attendanceRate * 100).toFixed(0)}%`,
+      }));
+      fileName = 'ملخص_حضور_المشرفين.xlsx';
+      sheetName = 'الملخص الإجمالي';
+    }
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, fileName);
+  };
+
 
   const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => (
     <button
@@ -141,8 +172,8 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl shadow-xl border border-stone-200 print-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+          <div className="md:col-span-1">
             <label htmlFor="start-date" className="block text-sm font-medium text-stone-700 mb-2">من تاريخ</label>
             <input
               type="date"
@@ -152,7 +183,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
               className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
             />
           </div>
-          <div>
+          <div className="md:col-span-1">
             <label htmlFor="end-date" className="block text-sm font-medium text-stone-700 mb-2">إلى تاريخ</label>
             <input
               type="date"
@@ -162,7 +193,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
               className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
             />
           </div>
-          <div>
+          <div className="md:col-span-1">
             <label htmlFor="supervisor-filter" className="block text-sm font-medium text-stone-700 mb-2">المشرف</label>
             <select
               id="supervisor-filter"
@@ -176,7 +207,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
               ))}
             </select>
           </div>
-          <div>
+          <div className="md:col-span-1">
             <button
               onClick={handleClearFilters}
               className="w-full h-10 px-4 text-sm font-semibold text-stone-700 bg-stone-200 rounded-md shadow-sm hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-400 transition-all duration-150"
@@ -184,7 +215,14 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
               مسح الفلتر
             </button>
           </div>
-          <div>
+          <div className="md:col-span-2 grid grid-cols-2 gap-2">
+            <button
+                onClick={handleExport}
+                className="w-full h-10 px-4 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2"
+            >
+                <ExcelIcon />
+                تصدير لإكسل
+            </button>
             <button
               onClick={() => window.print()}
               className="w-full h-10 px-4 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"

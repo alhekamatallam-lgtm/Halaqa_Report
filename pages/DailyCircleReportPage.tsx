@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { ProcessedStudentData, CircleReportData, SupervisorData } from '../types';
 import CircleFilterControls from '../components/CircleFilterControls';
 import { CircleReportTable } from '../components/CircleReportTable';
-import { PrintIcon } from '../components/icons';
+import { PrintIcon, ExcelIcon } from '../components/icons';
 import Pagination from '../components/Pagination';
 
 const ITEMS_PER_PAGE = 10;
@@ -72,7 +72,7 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
     setSelectedDay('');
   };
   
-  const { paginatedCircles, totalPages, summary } = useMemo(() => {
+  const { paginatedCircles, totalPages, summary, fullCircleList } = useMemo(() => {
     let filteredStudents = students;
 
     if (selectedDay) {
@@ -167,7 +167,7 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
         currentPage * ITEMS_PER_PAGE
     );
     
-    return { paginatedCircles, totalPages, summary };
+    return { paginatedCircles, totalPages, summary, fullCircleList: report };
   }, [students, searchQuery, selectedCircleTime, selectedTeacher, supervisors, selectedDay, currentPage]);
 
   const reportTitle = `التقرير اليومي للحلقات ${selectedDay ? `- ${selectedDay}`: ''}`;
@@ -275,9 +275,41 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
         document.body.removeChild(printContainer);
     };
 
+  const handleExport = () => {
+        // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
+        const XLSX = (window as any).XLSX;
+        const dataToExport = fullCircleList.map(circle => ({
+          'الحلقة': circle.circleName,
+          'المعلم': circle.teacherName,
+          'المشرف التعليمي': circle.supervisorName,
+          'عدد الطلاب': circle.studentCount,
+          'مجموع أوجه الحفظ': circle.totalMemorizationAchieved.toFixed(1),
+          'مؤشر الحفظ': `${(circle.avgMemorizationIndex * 100).toFixed(0)}%`,
+          'مجموع أوجه المراجعة': circle.totalReviewAchieved.toFixed(1),
+          'مؤشر المراجعة': `${(circle.avgReviewIndex * 100).toFixed(0)}%`,
+          'مجموع أوجه التثبيت': circle.totalConsolidationAchieved.toFixed(1),
+          'مؤشر التثبيت': `${(circle.avgConsolidationIndex * 100).toFixed(0)}%`,
+          'المؤشر العام': `${(circle.avgGeneralIndex * 100).toFixed(0)}%`,
+          'متوسط الحضور': `${(circle.avgAttendance * 100).toFixed(0)}%`,
+          'إجمالي النقاط': circle.totalPoints,
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'التقرير اليومي للحلقات');
+        XLSX.writeFile(wb, 'التقرير_اليومي_للحلقات.xlsx');
+  };
+
   return (
     <>
-      <div className="flex justify-end mb-4 print-hidden">
+      <div className="flex justify-end mb-4 print-hidden gap-2">
+            <button
+                onClick={handleExport}
+                className="px-4 py-2 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2"
+            >
+                <ExcelIcon />
+                تصدير لإكسل
+            </button>
           <button
               onClick={handlePrint}
               className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"

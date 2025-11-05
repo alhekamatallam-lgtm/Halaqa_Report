@@ -192,6 +192,7 @@ const NotesPage: React.FC<NotesPageProps> = ({ students }) => {
 
                 return {
                     ...latestRow,
+                    id: `agg-${latestRow.username}`,
                     memorizationLessons: agg.memorizationLessons.join(', '),
                     memorizationPages: createAchievement(agg.memAchieved, agg.memRequired),
                     reviewLessons: agg.reviewLessons.join(', '),
