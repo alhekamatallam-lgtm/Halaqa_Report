@@ -13,6 +13,7 @@ interface TeacherAttendancePageProps {
 const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher }) => {
     
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const handleFullscreenChange = () => {
         const isCurrentlyFullscreen = !!document.fullscreenElement;
@@ -53,6 +54,16 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
         month: 'long',
         day: 'numeric'
     }).format(today);
+    
+    const filteredTeachers = React.useMemo(() => {
+        if (!searchQuery) {
+            return allTeachers;
+        }
+        return allTeachers.filter(teacher =>
+            teacher.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [allTeachers, searchQuery]);
+
 
     if (allTeachers.length === 0) {
         return (
@@ -76,31 +87,56 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                     </button>
                 </div>
             </div>
+
+            <div className="mb-6">
+                <label htmlFor="teacher-search" className="block text-sm font-medium text-stone-700 mb-2">بحث سريع بالمعلم</label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        id="teacher-search"
+                        className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                        placeholder="ادخل اسم المعلم..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-                {allTeachers.map(teacher => {
+                {filteredTeachers.map(teacher => {
                     const teacherName = teacher.name;
                     const statusInfo = statusMap.get(teacherName);
                     const isThisTeacherSubmitting = submittingTeacher === teacherName;
+                    const notes = statusInfo?.notes;
 
                     let statusText = 'لم يحضر';
                     let statusColor = 'bg-yellow-500';
                     let borderColor = 'border-yellow-500';
+                    let bgColor = 'bg-yellow-50/50';
                     
                     if (isThisTeacherSubmitting) {
                         statusText = 'جاري التحديث...';
                         statusColor = 'bg-indigo-500 animate-pulse';
                         borderColor = 'border-indigo-500';
+                        bgColor = 'bg-indigo-50/50';
                     } else if (statusInfo) {
                         switch(statusInfo.status) {
                             case 'حاضر':
                                 statusText = 'حاضر';
                                 statusColor = 'bg-green-500';
                                 borderColor = 'border-green-500';
+                                bgColor = 'bg-green-50/50';
                                 break;
                             case 'مكتمل الحضور':
                                 statusText = 'مكتمل الحضور';
                                 statusColor = 'bg-blue-600';
                                 borderColor = 'border-blue-600';
+                                bgColor = 'bg-blue-50/50';
                                 break;
                             default:
                                 break;
@@ -122,7 +158,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                     const canCheckOut = !!statusInfo?.checkIn && !statusInfo?.checkOut;
 
                     return (
-                        <div key={teacherName} className={`bg-stone-50 p-4 rounded-xl shadow-lg border-l-4 ${borderColor} transition-all hover:shadow-xl hover:border-amber-500 flex flex-col justify-between`}>
+                        <div key={teacherName} className={`${bgColor} p-4 rounded-xl shadow-lg border-l-4 ${borderColor} transition-all hover:shadow-xl hover:border-amber-500 flex flex-col justify-between`}>
                             <div>
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
@@ -131,6 +167,11 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                                     </div>
                                     <span className={`px-2 py-1 text-xs font-bold text-white rounded-full ${statusColor}`}>{statusText}</span>
                                 </div>
+                                {notes && (
+                                    <p className="text-xs text-center font-semibold text-red-600 bg-red-100 py-1 px-2 rounded-md my-2">
+                                        {notes}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex gap-2 mt-4">
                                 <div className="w-full flex flex-col">
@@ -161,6 +202,11 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                         </div>
                     );
                 })}
+                {filteredTeachers.length === 0 && allTeachers.length > 0 && (
+                    <div className="col-span-full text-center py-10">
+                        <p className="text-lg text-gray-600">لا يوجد معلمون يطابقون بحثك.</p>
+                    </div>
+                )}
             </div>
         </div>
     );

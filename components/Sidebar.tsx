@@ -13,9 +13,11 @@ import {
     StudentFollowUpIcon,
     StudentAttendanceIcon,
     StudentAbsenceIcon,
+    SettingsIcon,
+    IdentificationIcon,
 } from './icons';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 interface SidebarProps {
   currentPage: Page;
@@ -101,7 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                     <NavLink label="تقرير حضور المعلمين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'teacherAttendanceReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherAttendanceReport')} />
                     <NavLink label="حضور المشرفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'supervisorAttendance'} isCollapsed={isCollapsed} onClick={() => onNavigate('supervisorAttendance')} />
                     <NavLink label="تقرير حضور المشرفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'supervisorAttendanceReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('supervisorAttendanceReport')} />
+                    <NavLink label="قائمة المعلمين" icon={<IdentificationIcon className="w-5 h-5" />} isActive={currentPage === 'teacherList'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherList')} />
                  </NavSection>
+
+                <NavSection title="الإدارة" isCollapsed={isCollapsed}>
+                    <NavLink label="الإعدادات" icon={<SettingsIcon className="w-5 h-5" />} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} onClick={() => onNavigate('settings')} />
+                </NavSection>
+
             </nav>
             <div className="p-3 border-t border-stone-200">
                 <button

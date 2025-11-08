@@ -12,6 +12,16 @@ interface DailyCircleReportPageProps {
   supervisors: SupervisorData[];
 }
 
+const parseDateFromDayString = (dayString: string): Date => {
+    const match = dayString.match(/(\d{2})-(\d{2})/);
+    if (!match) {
+        return new Date(0);
+    }
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    return new Date(new Date().getFullYear(), month - 1, day);
+};
+
 const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students, supervisors }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCircleTime, setSelectedCircleTime] = useState('');
@@ -25,7 +35,11 @@ const DailyCircleReportPage: React.FC<DailyCircleReportPageProps> = ({ students,
 
   const dayOptions = useMemo(() => {
     const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));
-    return Array.from(days).sort((a,b) => a.localeCompare(b, 'ar'));
+    return Array.from(days).sort((a, b) => {
+        const dateA = parseDateFromDayString(a);
+        const dateB = parseDateFromDayString(b);
+        return dateB.getTime() - dateA.getTime();
+    });
   }, [students]);
 
   const studentsForFiltering = useMemo(() => {

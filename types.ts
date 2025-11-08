@@ -162,6 +162,7 @@ export interface RawTeacherAttendanceData {
   "time": string;
   "name": string;
   "status": 'حضور' | 'انصراف';
+  "ملاحظات"?: string;
 }
 
 export interface TeacherInfo {
@@ -169,11 +170,18 @@ export interface TeacherInfo {
   circle: string;
 }
 
+export interface RawTeacherInfo {
+  "المعلم": string;
+  "الحلقات": string;
+  "وقت الحلقة": string;
+}
+
 export interface TeacherDailyAttendance {
   teacherName: string;
   checkIn: Date | null;
   checkOut: Date | null;
   status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور';
+  notes?: string;
 }
 
 export interface TeacherAttendanceReportEntry {
@@ -230,3 +238,10 @@ export interface ProcessedRegisteredStudentData {
   studentName: string;
   circle: string;
 }
+
+export interface RawSettingData {
+  "key": string;
+  "value": string;
+}
+
+export type ProcessedSettingsData = Record<string, string>;

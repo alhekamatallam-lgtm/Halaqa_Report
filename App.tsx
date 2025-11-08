@@ -18,10 +18,12 @@ import ExamReportPage from './pages/ExamReportPage';
 import StudentFollowUpPage from './pages/StudentFollowUpPage';
 import StudentAttendanceReportPage from './pages/StudentAttendanceReportPage';
 import StudentAbsenceReportPage from './pages/StudentAbsenceReportPage';
+import SettingsPage from './pages/SettingsPage';
+import TeacherListPage from './pages/TeacherListPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo } from './types';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
@@ -105,15 +107,25 @@ const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
     }));
 };
 
+const processTeachersInfoData = (data: RawTeacherInfo[]): TeacherInfo[] => {
+    return data
+        .filter(item => (item['وقت الحلقة'] || '').trim() === 'العصر')
+        .map(item => ({
+            name: (item['المعلم'] || '').trim(),
+            circle: (item['الحلقات'] || '').trim()
+        }))
+        .filter(item => item.name && item.circle);
+};
+
 const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeacherNames: string[]): TeacherDailyAttendance[] => {
     const timeZone = 'Asia/Riyadh';
     const todayRiyadh = new Date(new Date().toLocaleString('en-US', { timeZone }));
     todayRiyadh.setHours(0, 0, 0, 0);
 
-    const teacherRecords = new Map<string, { checkIn: Date | null, checkOut: Date | null }>();
+    const teacherRecords = new Map<string, { checkIn: Date | null, checkOut: Date | null, checkInNote: string | null, checkOutNote: string | null }>();
 
     allTeacherNames.forEach(name => {
-        teacherRecords.set(name, { checkIn: null, checkOut: null });
+        teacherRecords.set(name, { checkIn: null, checkOut: null, checkInNote: null, checkOutNote: null });
     });
 
     data.forEach(item => {
@@ -123,6 +135,7 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
         
         const teacherName = (item['name'] || '').trim();
         const status = (item.status || '').trim();
+        const note = (item['ملاحظات'] || '').trim();
 
         if (itemDateRiyadh.getTime() === todayRiyadh.getTime() && teacherRecords.has(teacherName)) {
             const record = teacherRecords.get(teacherName)!;
@@ -130,10 +143,12 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
             if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
                 if (!record.checkIn || timestamp < record.checkIn) {
                     record.checkIn = timestamp;
+                    record.checkInNote = note || null;
                 }
             } else if (status === 'انصراف') {
                 if (!record.checkOut || timestamp > record.checkOut) {
                     record.checkOut = timestamp;
+                    record.checkOutNote = note || null;
                 }
             }
         }
@@ -147,11 +162,14 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
             status = 'حاضر';
         }
         
+        const combinedNotes = [times.checkInNote, times.checkOutNote].filter(Boolean).join('، ');
+        
         return {
             teacherName,
             checkIn: times.checkIn,
             checkOut: times.checkOut,
             status,
+            notes: combinedNotes || undefined,
         };
     });
 };
@@ -615,7 +633,16 @@ const processRegisteredStudentData = (data: RawRegisteredStudentData[]): Process
         .filter((item): item is ProcessedRegisteredStudentData => item !== null);
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport';
+const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
+    return data.reduce((acc, item) => {
+        if (item.key) {
+            acc[item.key] = item.value;
+        }
+        return acc;
+    }, {} as ProcessedSettingsData);
+};
+
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 
 const App: React.FC = () => {
@@ -625,10 +652,12 @@ const App: React.FC = () => {
     const [examData, setExamData] = useState<ProcessedExamData[]>([]);
     const [registeredStudents, setRegisteredStudents] = useState<ProcessedRegisteredStudentData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
+    const [teachersInfo, setTeachersInfo] = useState<TeacherInfo[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
     const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
     const [supervisorAttendance, setSupervisorAttendance] = useState<SupervisorDailyAttendance[]>([]);
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
+    const [settings, setSettings] = useState<ProcessedSettingsData>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittingTeacher, setSubmittingTeacher] = useState<string | null>(null);
@@ -643,19 +672,8 @@ const App: React.FC = () => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     const asrTeachersInfo = useMemo(() => {
-        const teacherInfoMap = new Map<string, TeacherInfo>();
-        students
-            .filter(s => s.circleTime === 'العصر' && s.teacherName && s.circle)
-            .forEach(s => {
-                if (!teacherInfoMap.has(s.teacherName)) {
-                    teacherInfoMap.set(s.teacherName, { name: s.teacherName, circle: s.circle });
-                }
-            });
-        return Array.from(teacherInfoMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
-    }, [students]);
-
-    const asrTeacherNames = useMemo(() => asrTeachersInfo.map(t => t.name), [asrTeachersInfo]);
-
+        return [...teachersInfo].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    }, [teachersInfo]);
 
     useEffect(() => {
         if (notification) {
@@ -734,20 +752,38 @@ const App: React.FC = () => {
                     }
                 }
 
+                let currentAsrTeachers: TeacherInfo[];
+                const teachersSheetData = dataContainer.teachers;
+                if (teachersSheetData && Array.isArray(teachersSheetData)) {
+                    currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
+                } else {
+                    const teacherInfoMap = new Map<string, TeacherInfo>();
+                    processedStudents
+                        .filter(s => s.circleTime === 'العصر' && s.teacherName && s.circle)
+                        .forEach(s => {
+                            if (!teacherInfoMap.has(s.teacherName)) {
+                                teacherInfoMap.set(s.teacherName, { name: s.teacherName, circle: s.circle });
+                            }
+                        });
+                    currentAsrTeachers = Array.from(teacherInfoMap.values());
+                }
+                setTeachersInfo(currentAsrTeachers);
+                const currentAsrTeacherNames = currentAsrTeachers.map(t => t.name);
+                
                 const attendanceRaw = dataContainer.attandance || [];
                 if (attendanceRaw && Array.isArray(attendanceRaw)) {
                     const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
-                    const currentAsrTeacherNames = Array.from<string>(new Set(
-                        processedStudents
-                            .filter(s => s.circleTime === 'العصر')
-                            .map(s => s.teacherName)
-                            .filter(Boolean)
-                    ));
                     const processedAttendance = processTeacherAttendanceData(rawAttendanceData, currentAsrTeacherNames);
                     setTeacherAttendance(processedAttendance);
 
                     const processedReport = processTeacherAttendanceReportData(rawAttendanceData, currentAsrTeacherNames);
                     setTeacherAttendanceReport(processedReport);
+                }
+
+                const settingsSheetData = dataContainer.setting;
+                if (settingsSheetData && Array.isArray(settingsSheetData)) {
+                    const processedSettings = processSettingsData(settingsSheetData as RawSettingData[]);
+                    setSettings(processedSettings);
                 }
 
             } catch (err) {
@@ -854,24 +890,63 @@ const App: React.FC = () => {
         const updatedTeacher = { ...teacherAttendance[teacherIndex] };
         const now = new Date();
 
+        const timeZone = 'Asia/Riyadh';
+        const riyadhTimeParts = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
+        }).formatToParts(now);
+
+        let riyadhHour = parseInt(riyadhTimeParts.find(p => p.type === 'hour')?.value || '0');
+        if (riyadhHour === 24) riyadhHour = 0; // Handle midnight case
+        const riyadhMinute = parseInt(riyadhTimeParts.find(p => p.type === 'minute')?.value || '0');
+
+        const lateTime = settings.teacher_late_checkin_time || '15:25';
+        const earlyTime = settings.teacher_early_checkout_time || '16:50';
+
+        const [lateHour, lateMinute] = lateTime.split(':').map(Number);
+        const [earlyHour, earlyMinute] = earlyTime.split(':').map(Number);
+
+        let note = '';
+        if (action === 'حضور') {
+            if (riyadhHour > lateHour || (riyadhHour === lateHour && riyadhMinute > lateMinute)) {
+                note = 'حضر متأخر';
+            }
+        } else { // action === 'انصراف'
+            if (riyadhHour < earlyHour || (riyadhHour === earlyHour && riyadhMinute < earlyMinute)) {
+                note = 'انصراف مبكر';
+            }
+        }
+
         if (action === 'حضور') {
             updatedTeacher.checkIn = now;
             updatedTeacher.status = 'حاضر';
+            if (note) {
+                 updatedTeacher.notes = [note, updatedTeacher.notes].filter(Boolean).join('، ');
+            }
         } else {
             updatedTeacher.checkOut = now;
             updatedTeacher.status = 'مكتمل الحضور';
+            if (note) {
+                 updatedTeacher.notes = [updatedTeacher.notes, note].filter(Boolean).join('، ');
+            }
         }
 
         const newAttendance = [...teacherAttendance];
         newAttendance[teacherIndex] = updatedTeacher;
         setTeacherAttendance(newAttendance);
-
-        const payload = {
+        
+        const payload: { [key: string]: any } = {
             sheet: 'attandance',
             "name": teacherName,
             "status": action,
             "time": now.toISOString(),
         };
+
+        if (note) {
+            payload["ملاحظات"] = note;
+        }
 
         try {
             await fetch(API_URL, {
@@ -952,9 +1027,40 @@ const App: React.FC = () => {
         }
     };
 
+    const handlePostSettings = async (data: ProcessedSettingsData) => {
+        setIsSubmitting(true);
+        setNotification(null);
+        const originalSettings = { ...settings };
+        setSettings(data);
+
+        try {
+            const payload = {
+                sheet: 'setting',
+                data: Object.entries(data).map(([key, value]) => ({ key, value })),
+            };
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload),
+            });
+             setNotification({ message: 'تم حفظ الإعدادات بنجاح!', type: 'success' });
+        } catch (err) {
+             if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+                console.log('Fetch error (settings), likely redirect. Assuming success.');
+                setNotification({ message: 'تم حفظ الإعدادات بنجاح!', type: 'success' });
+            } else {
+                console.error("فشل في حفظ الإعدادات:", err);
+                setNotification({ message: 'فشل حفظ الإعدادات.', type: 'error' });
+                setSettings(originalSettings);
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleNavigation = (page: Page) => {
         setInitialStudentFilter(null);
-        if ((page === 'evaluation' || page === 'exam') && !authenticatedUser) {
+        if ((page === 'evaluation' || page === 'exam' || page === 'settings') && !authenticatedUser) {
             setCurrentPage(page);
             setShowPasswordModal(true);
         } else {
@@ -1006,6 +1112,8 @@ const App: React.FC = () => {
         studentFollowUp: 'متابعة طالب',
         studentAttendanceReport: 'تقرير حضور الطلاب اليومي',
         studentAbsenceReport: 'تقرير غياب الطلاب',
+        settings: 'الإعدادات',
+        teacherList: 'قائمة المعلمين',
     };
 
     const renderPage = () => {
@@ -1015,7 +1123,7 @@ const App: React.FC = () => {
             case 'circles':
                 return <CircleReportPage students={students} supervisors={supervisors} />;
             case 'general':
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
+                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
             case 'dashboard':
                 return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
             case 'dailyDashboard':
@@ -1059,6 +1167,8 @@ const App: React.FC = () => {
                 );
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+            case 'teacherList':
+                return <TeacherListPage students={students} />;
             case 'supervisorAttendance':
                 return (
                     <SupervisorAttendancePage
@@ -1081,8 +1191,18 @@ const App: React.FC = () => {
                 return <StudentAttendanceReportPage students={dailyStudents} />;
             case 'studentAbsenceReport':
                 return <StudentAbsenceReportPage students={dailyStudents} />;
+            case 'settings':
+                if (authenticatedUser?.role !== 'admin') {
+                    return (
+                        <div className="text-center py-10 bg-white rounded-lg shadow-md">
+                            <p className="text-lg text-red-600 font-bold">غير مصرح لك بالدخول</p>
+                            <p className="text-gray-600 mt-2">هذه الصفحة متاحة للمدراء فقط.</p>
+                        </div>
+                    );
+                }
+                return <SettingsPage settings={settings} onSave={handlePostSettings} isSubmitting={isSubmitting} dailyStudents={dailyStudents} />;
             default:
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} />;
+                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
         }
     };
 
@@ -1132,8 +1252,8 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
-                        if (currentPage !== 'evaluation' && currentPage !== 'exam') {
-                             setCurrentPage(currentPage); // Stay on current page if it's not eval/exam
+                        if (currentPage !== 'evaluation' && currentPage !== 'exam' && currentPage !== 'settings') {
+                             setCurrentPage(currentPage);
                         }
                     }}
                     onClose={() => setShowPasswordModal(false)}

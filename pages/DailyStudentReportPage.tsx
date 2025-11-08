@@ -12,6 +12,18 @@ interface DailyStudentReportPageProps {
   students: ProcessedStudentData[];
 }
 
+const parseDateFromDayString = (dayString: string): Date => {
+    const match = dayString.match(/(\d{2})-(\d{2})/);
+    if (!match) {
+        // Fallback for any string that doesn't match, return an old date to sort it last
+        return new Date(0);
+    }
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    // JS months are 0-indexed
+    return new Date(new Date().getFullYear(), month - 1, day);
+};
+
 const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ students }) => {
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'ascending' | 'descending' } | null>({ key: 'totalPoints', direction: 'descending' });
     const [selectedStudent, setSelectedStudent] = useState<ProcessedStudentData | null>(null);
@@ -64,7 +76,11 @@ const DailyStudentReportPage: React.FC<DailyStudentReportPageProps> = ({ student
     // Memoize filter options based on selections for cascading effect
     const dayOptions = useMemo(() => {
         const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));
-        return Array.from(days).sort((a, b) => a.localeCompare(b, 'ar'));
+        return Array.from(days).sort((a, b) => {
+            const dateA = parseDateFromDayString(a);
+            const dateB = parseDateFromDayString(b);
+            return dateB.getTime() - dateA.getTime();
+        });
     }, [students]);
 
     const timeOptions = useMemo(() => {

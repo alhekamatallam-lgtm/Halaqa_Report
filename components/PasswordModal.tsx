@@ -16,7 +16,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, super
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (password === 'rajhi') {
+    if (password === 'admin123') {
       onSuccess({ role: 'admin', name: 'الإدارة', circles: [] });
       return;
     }

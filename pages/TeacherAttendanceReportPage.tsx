@@ -16,12 +16,13 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
   const [selectedTeacher, setSelectedTeacher] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [modalData, setModalData] = React.useState<{ title: string; dates: string[] } | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, selectedTeacher, activeTab]);
+  }, [startDate, endDate, selectedTeacher, searchQuery, activeTab]);
 
   const teachers = React.useMemo(() => {
     const teacherSet = new Set<string>(reportData.map(r => r.teacherName));
@@ -37,10 +38,11 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
       if (start && itemDate < start) return false;
       if (end && itemDate > end) return false;
       if (selectedTeacher && item.teacherName !== selectedTeacher) return false;
+      if (searchQuery && !item.teacherName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       
       return true;
     });
-  }, [reportData, startDate, endDate, selectedTeacher]);
+  }, [reportData, startDate, endDate, selectedTeacher, searchQuery]);
 
   const summaryData: TeacherAttendanceSummaryEntry[] = React.useMemo(() => {
     const summaryMap = new Map<string, { presentDates: Set<string>; absentDates: Set<string> }>();
@@ -94,6 +96,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
     setStartDate('');
     setEndDate('');
     setSelectedTeacher('');
+    setSearchQuery('');
   };
   
   const handleShowDates = (teacherName: string, type: 'present' | 'absent') => {
@@ -170,7 +173,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl shadow-xl border border-stone-200 print-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
           <div className="md:col-span-1">
             <label htmlFor="start-date" className="block text-sm font-medium text-stone-700 mb-2">من تاريخ</label>
             <input
@@ -191,8 +194,12 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
               className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
             />
           </div>
+           <div className="md:col-span-1">
+             <label htmlFor="teacher-search" className="block text-sm font-medium text-stone-700 mb-2">بحث بالمعلم</label>
+             <input type="text" id="teacher-search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="اسم المعلم..." className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
+        </div>
           <div className="md:col-span-1">
-            <label htmlFor="teacher-filter" className="block text-sm font-medium text-stone-700 mb-2">المعلم</label>
+            <label htmlFor="teacher-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة بالمعلم</label>
             <select
               id="teacher-filter"
               value={selectedTeacher}

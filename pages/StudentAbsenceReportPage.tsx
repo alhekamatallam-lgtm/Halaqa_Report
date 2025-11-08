@@ -12,6 +12,15 @@ interface StudentAbsenceRow {
     [day: string]: string; // Dynamic properties for attendance status
 }
 
+const parseDateFromDayString = (dayString: string): Date => {
+    const match = dayString.match(/(\d{2})-(\d{2})/);
+    if (!match) {
+        return new Date(0);
+    }
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    return new Date(new Date().getFullYear(), month - 1, day);
+};
 
 const StudentAbsenceReportPage: React.FC<{ students: ProcessedStudentData[] }> = ({ students }) => {
     const [currentPage, setCurrentPage] = useState(1);
@@ -64,7 +73,11 @@ const StudentAbsenceReportPage: React.FC<{ students: ProcessedStudentData[] }> =
 
     const dayOptions = useMemo(() => {
         const days = new Set<string>(students.map(s => s.day).filter((d): d is string => !!d));
-        return Array.from(days).sort((a, b) => a.localeCompare(b, 'ar'));
+        return Array.from(days).sort((a, b) => {
+            const dateA = parseDateFromDayString(a);
+            const dateB = parseDateFromDayString(b);
+            return dateB.getTime() - dateA.getTime();
+        });
     }, [students]);
     
     const timeOptions = useMemo(() => {
@@ -159,7 +172,11 @@ const StudentAbsenceReportPage: React.FC<{ students: ProcessedStudentData[] }> =
 
     const handleApplyFilter = () => {
         setActiveFilters({ 
-            days: selectedDays.sort((a, b) => a.localeCompare(b, 'ar')), 
+            days: selectedDays.sort((a, b) => {
+                const dateA = parseDateFromDayString(a);
+                const dateB = parseDateFromDayString(b);
+                return dateB.getTime() - dateA.getTime();
+            }), 
             circle: selectedCircle, 
             teacher: selectedTeacher, 
             circleTime: selectedCircleTime,

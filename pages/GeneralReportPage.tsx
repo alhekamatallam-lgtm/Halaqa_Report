@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { ProcessedStudentData, GeneralReportStats } from '../types';
+import type { ProcessedStudentData, GeneralReportStats, ProcessedSettingsData } from '../types';
 
 // --- Icon Components ---
 const CircleIcon = () => (
@@ -51,40 +51,37 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, description, icon }) 
   </div>
 );
 
-// --- Main Page Component ---
-const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStudents: ProcessedStudentData[] }> = ({ students, dailyStudents }) => {
+const parseDateFromDayString = (dayString: string): Date => {
+    const match = dayString.match(/(\d{2})-(\d{2})/);
+    if (!match) return new Date(0);
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    return new Date(new Date().getFullYear(), month - 1, day);
+};
 
-  const stats: GeneralReportStats = useMemo(() => {
-    // 1. Filter daily data for the target day.
-    const targetDay = 'الأحد: 02-11';
-    const dailyStudentsForTargetDay = dailyStudents.filter(s => s.day === targetDay);
+// --- Main Page Component ---
+const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStudents: ProcessedStudentData[], settings: ProcessedSettingsData }> = ({ students, dailyStudents, settings }) => {
+
+  const { stats, targetDayLabel } = useMemo(() => {
+    // FIX: Explicitly set the generic type for `new Set` to `string` to ensure correct type inference.
+    const dayOptions = Array.from(new Set<string>(dailyStudents.map(s => s.day).filter((d): d is string => !!d)))
+        .sort((a, b) => parseDateFromDayString(b).getTime() - parseDateFromDayString(a).getTime());
+
+    const targetDay = settings.default_student_count_day || (dayOptions.length > 0 ? dayOptions[0] : null);
     
-    // 2. Calculate stats from the daily data.
+    const dailyStudentsForTargetDay = targetDay ? dailyStudents.filter(s => s.day === targetDay) : [];
+    
     const totalStudentsForTargetDay = new Set(dailyStudentsForTargetDay.map(s => s.username)).size;
     const totalAttendanceForDay = dailyStudentsForTargetDay.reduce((sum, s) => sum + s.attendance, 0);
     const avgAttendanceForDay = dailyStudentsForTargetDay.length > 0 ? totalAttendanceForDay / dailyStudentsForTargetDay.length : 0;
 
-    // Handle case where there's no weekly data for other stats.
-    if (students.length === 0) {
-      return {
-        totalCircles: 0,
-        totalStudents: totalStudentsForTargetDay,
-        totalMemorization: 0,
-        totalReview: 0,
-        totalConsolidation: 0,
-        totalAchievement: 0,
-        avgAttendance: avgAttendanceForDay,
-      };
-    }
-    
-    // 3. Calculate other stats from the full weekly student list ('report' sheet).
     const totalCircles = new Set(students.map(s => s.circle)).size;
     const totalMemorization = students.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
     const totalReview = students.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
     const totalConsolidation = students.reduce((sum, s) => sum + s.consolidationPages.achieved, 0);
     const totalAchievement = totalMemorization + totalReview + totalConsolidation;
 
-    return {
+    const finalStats: GeneralReportStats = {
       totalCircles,
       totalStudents: totalStudentsForTargetDay,
       totalMemorization,
@@ -93,19 +90,24 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStude
       totalAchievement,
       avgAttendance: avgAttendanceForDay,
     };
-  }, [students, dailyStudents]);
+
+    return {
+        stats: finalStats,
+        targetDayLabel: targetDay || 'لم يحدد يوم',
+    };
+  }, [students, dailyStudents, settings]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
       <StatCard icon={<CircleIcon />} label="إجمالي الحلقات" value={stats.totalCircles} description="جميع الحلقات الفعالة" />
       <StatCard 
         icon={<StudentIcon />} 
-        label="عدد الطلاب (يوم الأحد: 02-11)" 
+        label={`عدد الطلاب (${targetDayLabel})`}
         value={stats.totalStudents} 
       />
       <StatCard 
         icon={<AttendanceIcon />} 
-        label="متوسط الحضور (يوم الأحد: 02-11)" 
+        label={`متوسط الحضور (${targetDayLabel})`} 
         value={`${(stats.avgAttendance * 100).toFixed(1)}%`} 
       />
       
