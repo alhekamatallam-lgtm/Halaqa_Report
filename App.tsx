@@ -634,12 +634,17 @@ const processRegisteredStudentData = (data: RawRegisteredStudentData[]): Process
 };
 
 const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
-    return data.reduce((acc, item) => {
-        if (item.key) {
-            acc[item.key] = item.value;
-        }
-        return acc;
-    }, {} as ProcessedSettingsData);
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        return {};
+    }
+    const firstRow = data[0];
+    if (!firstRow) return {};
+
+    return {
+        default_student_count_day: firstRow["اليوم الافتراضي"] || '',
+        teacher_late_checkin_time: firstRow["وقت تأخر حضور المعلمين"] || '',
+        teacher_early_checkout_time: firstRow["وقت انصراف مبكر للمعلمين"] || '',
+    };
 };
 
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
@@ -1032,11 +1037,14 @@ const App: React.FC = () => {
         setNotification(null);
         const originalSettings = { ...settings };
         setSettings(data);
-
+    
         try {
             const payload = {
                 sheet: 'setting',
-                data: Object.entries(data).map(([key, value]) => ({ key, value })),
+                "الرقم": 1, // To identify the row to update
+                "اليوم الافتراضي": data.default_student_count_day,
+                "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time,
+                "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time,
             };
             await fetch(API_URL, {
                 method: 'POST',

@@ -240,8 +240,10 @@ export interface ProcessedRegisteredStudentData {
 }
 
 export interface RawSettingData {
-  "key": string;
-  "value": string;
+  "الرقم": number;
+  "اليوم الافتراضي": string;
+  "وقت تأخر حضور المعلمين": string;
+  "وقت انصراف مبكر للمعلمين": string;
 }
 
 export type ProcessedSettingsData = Record<string, string>;
