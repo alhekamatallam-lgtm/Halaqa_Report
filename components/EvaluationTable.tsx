@@ -1,10 +1,11 @@
 
+
 import React from 'react';
-import type { CircleEvaluationData } from '../types';
+import type { ProcessedEvalResult } from '../types';
 import { ProgressBar } from './ProgressBar';
 
 interface EvaluationTableProps {
-  evaluations: CircleEvaluationData[];
+  evaluations: ProcessedEvalResult[];
 }
 
 const EvaluationTable: React.FC<EvaluationTableProps> = ({ evaluations }) => {
@@ -35,15 +36,15 @@ const EvaluationTable: React.FC<EvaluationTableProps> = ({ evaluations }) => {
         <tbody className="bg-stone-50 divide-y divide-stone-200">
           {evaluations.length > 0 ? (
             evaluations.map((item) => (
-              <tr key={item.circleName} className="hover:bg-amber-100/50 transition-colors">
+              <tr key={item.id} className="hover:bg-amber-100/50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-stone-900 text-center">{item.circleName}</td>
-                {renderCellWithProgress(item.discipline)}
-                {renderCellWithProgress(item.memorization)}
-                {renderCellWithProgress(item.review)}
-                {renderCellWithProgress(item.consolidation)}
-                {renderCellWithProgress(item.generalIndex)}
-                {renderCellWithProgress(item.attendance)}
-                {renderCellWithProgress(item.overall)}
+                {renderCellWithProgress(item.scores.find(s => s.question === 'انضباط الحلقة')?.score || 0)}
+                {renderCellWithProgress(item.scores.find(s => s.question === 'إنجاز الحفظ')?.score || 0)}
+                {renderCellWithProgress(item.scores.find(s => s.question === 'إنجاز المراجعة')?.score || 0)}
+                {renderCellWithProgress(item.scores.find(s => s.question === 'إنجاز التثبيت')?.score || 0)}
+                {renderCellWithProgress(item.scores.find(s => s.question === 'المؤشر العام')?.score || 0)}
+                {renderCellWithProgress(item.scores.find(s => s.question === 'نسبة الحضور')?.score || 0)}
+                {renderCellWithProgress(item.totalScore / item.maxScore)}
               </tr>
             ))
           ) : (

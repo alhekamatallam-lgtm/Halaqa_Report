@@ -15,7 +15,8 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
   const [selectedStudent, setSelectedStudent] = useState(''); // Stores JSON string of {studentName, circle}
   const [examName, setExamName] = useState('');
   const [scores, setScores] = useState<Array<number | ''>>(['', '', '', '', '']);
-  const [totalScore, setTotalScore] = useState(0);
+  // FIX: Changed state to handle empty string for total score to resolve type mismatch.
+  const [totalScore, setTotalScore] = useState<number | ''>(0);
   const [error, setError] = useState<string | null>(null);
 
   const manageableStudents = useMemo(() => {
@@ -38,6 +39,10 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
   }, [manageableStudents, selectedCircle]);
 
   useEffect(() => {
+    if (scores.every(s => s === '')) {
+        setTotalScore('');
+        return;
+    }
     const newTotal = scores.reduce((acc: number, score) => acc + (Number(score) || 0), 0);
     setTotalScore(newTotal);
   }, [scores]);
@@ -62,6 +67,7 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
       setSelectedStudent('');
       setExamName('');
       setScores(['', '', '', '', '']);
+      setTotalScore('');
       setError(null);
   };
 
@@ -157,7 +163,7 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
                         ))}
                         <div className="col-span-1 sm:col-span-2 md:col-span-1 bg-stone-100 p-4 rounded-lg text-center">
                             <label className="block text-sm font-medium text-stone-700">الإجمالي</label>
-                            <p className="text-3xl font-bold text-amber-600 mt-2">{totalScore}</p>
+                            <p className="text-3xl font-bold text-amber-600 mt-2">{totalScore === '' ? '-' : totalScore}</p>
                         </div>
                     </div>
                 </div>

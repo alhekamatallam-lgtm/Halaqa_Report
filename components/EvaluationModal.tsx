@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { EvaluationSubmissionData, ProcessedStudentData, CircleEvaluationData } from '../types';
+import type { EvaluationSubmissionData, ProcessedStudentData, ProcessedEvalResult } from '../types';
 
 interface EvaluationModalProps {
   isOpen: boolean;
@@ -7,7 +7,7 @@ interface EvaluationModalProps {
   onSubmit: (data: EvaluationSubmissionData) => Promise<void>;
   isSubmitting: boolean;
   students: ProcessedStudentData[];
-  evaluationData: CircleEvaluationData[];
+  evaluationData: ProcessedEvalResult[];
 }
 
 const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSubmit, isSubmitting, students, evaluationData }) => {

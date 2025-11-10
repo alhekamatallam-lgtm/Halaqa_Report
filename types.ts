@@ -77,17 +77,7 @@ export interface GeneralReportStats {
   avgAttendance: number;
 }
 
-export interface RawCircleEvaluationData {
-  "الحلقة": string;
-  "انضباط الحلقة": number;
-  "انجاز الحفظ": number;
-  "انجاز المراجعة": number;
-  "انجاز التثبيت": number;
-  "المؤشر العام": number;
-  "نسبة الحضور": number;
-  "التقييم العام": number;
-}
-
+// FIX: Added missing type definitions for evaluation-related components.
 export interface CircleEvaluationData {
   circleName: string;
   discipline: number;
@@ -100,15 +90,48 @@ export interface CircleEvaluationData {
 }
 
 export interface EvaluationSubmissionData {
-  "الحلقة": string;
-  "انضباط الحلقة": number;
-  "انجاز الحفظ": number;
-  "انجاز المراجعة": number;
-  "انجاز التثبيت": number;
-  "نسبة الحضور": number;
-  "المؤشر العام": number;
-  "التقييم العام": number;
+  'الحلقة': string;
+  'انضباط الحلقة': number;
+  'انجاز الحفظ': number;
+  'انجاز المراجعة': number;
+  'انجاز التثبيت': number;
+  'نسبة الحضور': number;
+  'المؤشر العام': number;
+  'التقييم العام': number;
 }
+
+export interface EvalQuestion {
+  id: number;
+  que: string;
+  mark: number;
+}
+
+export interface EvalSubmissionPayload {
+    sheet: 'Eval_result';
+    'المعلم': string;
+    'الحلقة': string;
+    [question: string]: string | number;
+}
+
+export interface RawEvalResult {
+    'المعلم': string;
+    'الحلقة': string;
+    [question: string]: string | number;
+}
+
+export interface ProcessedEvalResult {
+    id: string;
+    teacherName: string;
+    circleName: string;
+    totalScore: number;
+    maxScore: number;
+    scores: {
+        question: string;
+        score: number;
+        maxMark: number;
+    }[];
+}
+
 
 export interface ExamSubmissionData {
     "الطالب": string;

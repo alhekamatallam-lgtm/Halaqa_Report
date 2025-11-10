@@ -23,9 +23,9 @@ import TeacherListPage from './pages/TeacherListPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult } from './types';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbyKdZm4Q4vnmlHsElPj5kLQTRHGvFiR6vVBB0jSYdQDhcnAjeh5FSKaRS6eCNpqBBeR/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxnWt66AHyIyLK8PYm_nJnk4k4R-e3N1jVwa7WCshw3Lxd0OhljuYuALwQOQkTAqbI2/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
 
 const parseAchievement = (value: any): Achievement => {
@@ -60,27 +60,69 @@ const parsePercentage = (value: any): number => {
     return numValue > 1 ? numValue / 100 : numValue;
 };
 
+const processEvalResultsData = (
+  data: RawEvalResult[],
+  questions: EvalQuestion[]
+): { processedResults: ProcessedEvalResult[]; headerMap: Map<number, string> } => {
+  const headerMap = new Map<number, string>();
+  const maxScore = questions.reduce((sum, q) => sum + q.mark, 0);
 
-const processEvaluationData = (data: RawCircleEvaluationData[]): CircleEvaluationData[] => {
-    return data.map(item => {
-        const circleName = String(item["الحلقة"] || '').trim();
-        if (!circleName) {
-            return null;
-        }
+  // Build the header map from the first data row and the questions list for robust matching.
+  if (data.length > 0) {
+    const firstRow = data[0];
+    const headers = Object.keys(firstRow);
+    const normalize = (text: string): string =>
+      String(text || '')
+        .normalize('NFC')
+        .replace(/[\u200B-\u200D\uFEFF\s]/g, '') // Remove zero-width chars and all whitespace
+        .replace(/[إأآا]/g, 'ا'); // Unify Alif
 
-        return {
-            circleName,
-            discipline: parsePercentage(item["انضباط الحلقة"]),
-            memorization: parsePercentage(item["انجاز الحفظ"]),
-            review: parsePercentage(item["انجاز المراجعة"]),
-            consolidation: parsePercentage(item["انجاز التثبيت"]),
-            attendance: parsePercentage(item["نسبة الحضور"]),
-            generalIndex: parsePercentage(item["المؤشر العام"]),
-            overall: parsePercentage(item["التقييم العام"]),
-        };
-    })
-    .filter((item): item is CircleEvaluationData => item !== null);
+    questions.forEach(q => {
+      const normalizedQue = normalize(q.que);
+      const foundHeader = headers.find(h => normalize(h) === normalizedQue);
+      if (foundHeader) {
+        headerMap.set(q.id, foundHeader.trim()); // Store the exact, trimmed header
+      } else {
+        // Fallback for safety, use the question from the 'eval' sheet
+        headerMap.set(q.id, q.que.trim());
+      }
+    });
+  } else {
+    // If there's no previous data, we assume the `eval` sheet's questions are the headers
+    questions.forEach(q => {
+        headerMap.set(q.id, q.que.trim());
+    });
+  }
+
+  const processedResults = data.map((row, index) => {
+    let totalScore = 0;
+    const scores = questions.map(q => {
+      const header = headerMap.get(q.id);
+      if (!header) {
+        return { question: q.que, score: 0, maxMark: q.mark };
+      }
+      const score = Number(row[header as keyof RawEvalResult]) || 0;
+      totalScore += score;
+      return {
+        question: q.que,
+        score: score,
+        maxMark: q.mark,
+      };
+    });
+
+    return {
+      id: `${row['المعلم']}-${row['الحلقة']}-${index}`,
+      teacherName: String(row['المعلم'] || ''),
+      circleName: String(row['الحلقة'] || ''),
+      totalScore,
+      maxScore,
+      scores,
+    };
+  }).sort((a,b) => b.totalScore - a.totalScore);
+
+  return { processedResults, headerMap };
 };
+
 
 const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
     const supervisorMap = new Map<string, { password: string; circles: string[] }>();
@@ -637,14 +679,12 @@ const extractTimeFromSheetDate = (value: string | undefined): string => {
     if (!value || typeof value !== 'string') {
         return '';
     }
-    // Check if it's in the format "YYYY-MM-DD HH:mm:ss"
-    const parts = value.split(' ');
-    if (parts.length === 2 && parts[1].includes(':')) {
-        const timePart = parts[1]; // "HH:mm:ss"
-        return timePart.substring(0, 5); // "HH:mm"
+    // Find the HH:mm part in the string.
+    const timeMatch = value.match(/\d{2}:\d{2}/);
+    if (timeMatch) {
+        return timeMatch[0]; // Returns "HH:mm"
     }
-    // Assume it's already in "HH:mm" format or return as is.
-    return value;
+    return '';
 };
 
 const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
@@ -667,7 +707,9 @@ type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
     const [dailyStudents, setDailyStudents] = useState<ProcessedStudentData[]>([]);
-    const [evaluationData, setEvaluationData] = useState<CircleEvaluationData[]>([]);
+    const [evalQuestions, setEvalQuestions] = useState<EvalQuestion[]>([]);
+    const [evalResults, setEvalResults] = useState<ProcessedEvalResult[]>([]);
+    const [evalHeaderMap, setEvalHeaderMap] = useState<Map<number, string>>(new Map());
     const [examData, setExamData] = useState<ProcessedExamData[]>([]);
     const [registeredStudents, setRegisteredStudents] = useState<ProcessedRegisteredStudentData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
@@ -737,10 +779,15 @@ const App: React.FC = () => {
                     setDailyStudents(processedDailyStudents);
                 }
                 
-                const evaluationSheetData = dataContainer['Evaluation_Sheet'];
-                if (evaluationSheetData && Array.isArray(evaluationSheetData)) {
-                    const processedEvaluations = processEvaluationData(evaluationSheetData as RawCircleEvaluationData[]);
-                    setEvaluationData(processedEvaluations);
+                const evalQuestionsData = dataContainer.eval;
+                if (evalQuestionsData && Array.isArray(evalQuestionsData)) {
+                    const questions = evalQuestionsData as EvalQuestion[];
+                    setEvalQuestions(questions);
+
+                    const evalResultsData = dataContainer.Eval_result || [];
+                    const { processedResults, headerMap } = processEvalResultsData(evalResultsData as RawEvalResult[], questions);
+                    setEvalResults(processedResults);
+                    setEvalHeaderMap(headerMap);
                 }
 
                 const examSheetData = dataContainer.exam;
@@ -771,20 +818,10 @@ const App: React.FC = () => {
                     }
                 }
 
-                let currentAsrTeachers: TeacherInfo[];
+                let currentAsrTeachers: TeacherInfo[] = [];
                 const teachersSheetData = dataContainer.teachers;
                 if (teachersSheetData && Array.isArray(teachersSheetData)) {
                     currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
-                } else {
-                    const teacherInfoMap = new Map<string, TeacherInfo>();
-                    processedStudents
-                        .filter(s => s.circleTime === 'العصر' && s.teacherName && s.circle)
-                        .forEach(s => {
-                            if (!teacherInfoMap.has(s.teacherName)) {
-                                teacherInfoMap.set(s.teacherName, { name: s.teacherName, circle: s.circle });
-                            }
-                        });
-                    currentAsrTeachers = Array.from(teacherInfoMap.values());
                 }
                 setTeachersInfo(currentAsrTeachers);
                 const currentAsrTeacherNames = currentAsrTeachers.map(t => t.name);
@@ -824,19 +861,14 @@ const App: React.FC = () => {
         fetchData();
     }, []);
 
-    const handlePostEvaluation = async (data: EvaluationSubmissionData) => {
+    const handlePostEvaluation = async (data: EvalSubmissionPayload) => {
         setIsSubmitting(true);
         setNotification(null);
         try {
-            const payload = {
-                sheet: 'Evaluation_Sheet',
-                ...data
-            };
-
             await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(data),
             });
         } catch (err) {
             if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
@@ -852,19 +884,20 @@ const App: React.FC = () => {
         try {
             await new Promise(resolve => setTimeout(resolve, 3000));
             const cacheBuster = `&v=${new Date().getTime()}`;
-            const evaluationResponse = await fetch(`${API_URL}?sheetName=Evaluation_Sheet${cacheBuster}`);
+            const evaluationResponse = await fetch(`${API_URL}?sheetName=Eval_result${cacheBuster}`);
             if (!evaluationResponse.ok) throw new Error(`خطأ في تحديث البيانات: ${evaluationResponse.statusText}`);
             const evaluationJson = await evaluationResponse.json();
             
             const dataContainer = evaluationJson.data || evaluationJson;
-            const refreshedEvaluationsRaw = dataContainer['Evaluation_Sheet'] || (Array.isArray(dataContainer) ? dataContainer : []);
+            const refreshedResultsRaw = dataContainer['Eval_result'] || (Array.isArray(dataContainer) ? dataContainer : []);
             
-            if (!Array.isArray(refreshedEvaluationsRaw)) {
+            if (!Array.isArray(refreshedResultsRaw)) {
                  throw new Error('تنسيق بيانات التقييم المحدثة غير صالح.');
             }
 
-            const processedEvaluations = processEvaluationData(refreshedEvaluationsRaw as RawCircleEvaluationData[]);
-            setEvaluationData(processedEvaluations);
+            const { processedResults, headerMap } = processEvalResultsData(refreshedResultsRaw as RawEvalResult[], evalQuestions);
+            setEvalResults(processedResults);
+            setEvalHeaderMap(headerMap);
             setNotification({ message: 'تم إرسال التقييم بنجاح!', type: 'success' });
         } catch(refreshError) {
              console.error("فشل في تحديث البيانات بعد الإرسال:", refreshError);
@@ -1067,8 +1100,8 @@ const App: React.FC = () => {
                 keyField: 'الرقم',
                 "الرقم": 1, 
                 "اليوم الافتراضي": data.default_student_count_day,
-                "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time ? `1899-12-30 ${data.teacher_late_checkin_time}:00` : '',
-                "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time ? `1899-12-30 ${data.teacher_early_checkout_time}:00` : '',
+                "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time || '',
+                "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time || '',
             };
             await fetch(updateUrl, {
                 method: 'POST',
@@ -1155,144 +1188,4 @@ const App: React.FC = () => {
             case 'circles':
                 return <CircleReportPage students={students} supervisors={supervisors} />;
             case 'general':
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
-            case 'dashboard':
-                return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
-            case 'dailyDashboard':
-                return <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
-            case 'notes':
-                return <NotesPage students={students} />;
-            case 'excellence':
-                return <ExcellencePage students={students} supervisors={supervisors} />;
-            case 'evaluation':
-                 if (!authenticatedUser) return null;
-                return (
-                    <EvaluationPage
-                        onSubmit={handlePostEvaluation}
-                        isSubmitting={isSubmitting}
-                        evaluationData={evaluationData}
-                        students={students}
-                        authenticatedUser={authenticatedUser}
-                    />
-                );
-            case 'exam':
-                 if (!authenticatedUser) return null;
-                return (
-                    <ExamPage
-                        onSubmit={handlePostExam}
-                        isSubmitting={isSubmitting}
-                        students={registeredStudents}
-                        authenticatedUser={authenticatedUser}
-                    />
-                );
-            case 'examReport':
-                return <ExamReportPage examData={examData} />;
-            case 'teacherAttendance':
-                return (
-                    <TeacherAttendancePage 
-                        allTeachers={asrTeachersInfo}
-                        attendanceStatus={teacherAttendance}
-                        onSubmit={handlePostTeacherAttendance}
-                        isSubmitting={isSubmitting}
-                        submittingTeacher={submittingTeacher}
-                    />
-                );
-            case 'teacherAttendanceReport':
-                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
-            case 'teacherList':
-                return <TeacherListPage students={students} />;
-            case 'supervisorAttendance':
-                return (
-                    <SupervisorAttendancePage
-                        allSupervisors={supervisors.map(s => ({ name: s.supervisorName }))}
-                        attendanceStatus={supervisorAttendance}
-                        onSubmit={handlePostSupervisorAttendance}
-                        isSubmitting={isSubmitting}
-                        submittingSupervisor={submittingSupervisor}
-                    />
-                );
-            case 'supervisorAttendanceReport':
-                return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
-            case 'dailyStudents':
-                return <DailyStudentReportPage students={dailyStudents} />;
-            case 'dailyCircles':
-                return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
-            case 'studentFollowUp':
-                return <StudentFollowUpPage students={students} />;
-            case 'studentAttendanceReport':
-                return <StudentAttendanceReportPage students={dailyStudents} />;
-            case 'studentAbsenceReport':
-                return <StudentAbsenceReportPage students={dailyStudents} />;
-            case 'settings':
-                if (authenticatedUser?.role !== 'admin') {
-                    return (
-                        <div className="text-center py-10 bg-white rounded-lg shadow-md">
-                            <p className="text-lg text-red-600 font-bold">غير مصرح لك بالدخول</p>
-                            <p className="text-gray-600 mt-2">هذه الصفحة متاحة للمدراء فقط.</p>
-                        </div>
-                    );
-                }
-                return <SettingsPage settings={settings} onSave={handlePostSettings} isSubmitting={isSubmitting} dailyStudents={dailyStudents} />;
-            default:
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
-        }
-    };
-
-    return (
-        <div className="flex h-screen bg-stone-100 text-stone-800 font-sans">
-            <Notification notification={notification} onClose={() => setNotification(null)} />
-            
-            <Sidebar 
-                currentPage={currentPage} 
-                onNavigate={handleNavigation}
-                isCollapsed={isSidebarCollapsed}
-                onToggle={() => setIsSidebarCollapsed(prev => !prev)}
-            />
-
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="bg-white/80 backdrop-blur-sm shadow-md z-10 print-hidden border-b border-stone-200">
-                    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex items-center justify-between py-2">
-                            <div className="flex items-center gap-3">
-                                <img src={LOGO_URL} alt="شعار المجمع" className="h-14 md:h-16" />
-                                <div className='hidden sm:block'>
-                                    <h2 className="text-lg font-semibold text-stone-600">مجمع الراجحي بشبرا</h2>
-                                    <p className="text-sm text-stone-500">نظام متابعة أداء الحلقات</p>
-                                </div>
-                            </div>
-                            <div className="text-center flex-grow">
-                                <h1 className="text-xl sm:text-2xl font-bold leading-tight text-stone-800">
-                                    {titles[currentPage]}
-                                </h1>
-                            </div>
-                            <div className="w-24 sm:w-48"> {/* Spacer to help center the title */}
-                            </div>
-                        </div>
-                    </div>
-                </header>
-                
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                    <div className="animate-slide-in">
-                        {renderPage()}
-                    </div>
-                </main>
-            </div>
-
-            {showPasswordModal && (
-                <PasswordModal
-                    supervisors={supervisors}
-                    onSuccess={(user) => {
-                        setAuthenticatedUser(user);
-                        setShowPasswordModal(false);
-                        if (currentPage !== 'evaluation' && currentPage !== 'exam' && currentPage !== 'settings') {
-                             setCurrentPage(currentPage);
-                        }
-                    }}
-                    onClose={() => setShowPasswordModal(false)}
-                />
-            )}
-        </div>
-    );
-};
-
-export default App;
+                return <GeneralReportPage students
