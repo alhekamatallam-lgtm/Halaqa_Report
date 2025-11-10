@@ -19,13 +19,16 @@ const parseDateFromDayString = (dayString: string): Date => {
 const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitting, dailyStudents }) => {
   const [localSettings, setLocalSettings] = useState<ProcessedSettingsData>({
     default_student_count_day: '',
-    teacher_late_checkin_time: '15:25',
-    teacher_early_checkout_time: '16:50',
+    teacher_late_checkin_time: '',
+    teacher_early_checkout_time: '',
   });
 
   useEffect(() => {
-    // Merge fetched settings with defaults, so form is always complete
-    setLocalSettings(prev => ({ ...prev, ...settings }));
+    setLocalSettings({
+      default_student_count_day: settings.default_student_count_day || '',
+      teacher_late_checkin_time: settings.teacher_late_checkin_time || '15:25',
+      teacher_early_checkout_time: settings.teacher_early_checkout_time || '16:50',
+    });
   }, [settings]);
 
   const handleChange = (key: string, value: string) => {
@@ -61,7 +64,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
                     </label>
                     <select
                         id="default_day_select"
-                        value={localSettings.default_student_count_day || ''}
+                        value={localSettings.default_student_count_day}
                         onChange={(e) => handleChange('default_student_count_day', e.target.value)}
                         className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
                     >
@@ -76,7 +79,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
                         <input 
                             type="time" 
                             id="late_time_input" 
-                            value={localSettings.teacher_late_checkin_time || '15:25'} 
+                            value={localSettings.teacher_late_checkin_time} 
                             onChange={(e) => handleChange('teacher_late_checkin_time', e.target.value)} 
                             className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
                         />
@@ -86,7 +89,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
                         <input 
                             type="time" 
                             id="early_time_input" 
-                            value={localSettings.teacher_early_checkout_time || '16:50'} 
+                            value={localSettings.teacher_early_checkout_time} 
                             onChange={(e) => handleChange('teacher_early_checkout_time', e.target.value)} 
                             className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
                         />

@@ -25,7 +25,7 @@ import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
 import type { RawStudentData, ProcessedStudentData, Achievement, RawCircleEvaluationData, CircleEvaluationData, EvaluationSubmissionData, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo } from './types';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzAgG5Md-g7TInRO-qFkjHq8PBGx3t3I8gGOa7vb5II-PSmapsg9yoREYArpqkkOeKt/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyKdZm4Q4vnmlHsElPj5kLQTRHGvFiR6vVBB0jSYdQDhcnAjeh5FSKaRS6eCNpqBBeR/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
 
 const parseAchievement = (value: any): Achievement => {
@@ -633,6 +633,20 @@ const processRegisteredStudentData = (data: RawRegisteredStudentData[]): Process
         .filter((item): item is ProcessedRegisteredStudentData => item !== null);
 };
 
+const extractTimeFromSheetDate = (value: string | undefined): string => {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+    // Check if it's in the format "YYYY-MM-DD HH:mm:ss"
+    const parts = value.split(' ');
+    if (parts.length === 2 && parts[1].includes(':')) {
+        const timePart = parts[1]; // "HH:mm:ss"
+        return timePart.substring(0, 5); // "HH:mm"
+    }
+    // Assume it's already in "HH:mm" format or return as is.
+    return value;
+};
+
 const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return {};
@@ -642,8 +656,8 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
 
     return {
         default_student_count_day: firstRow["اليوم الافتراضي"] || '',
-        teacher_late_checkin_time: firstRow["وقت تأخر حضور المعلمين"] || '',
-        teacher_early_checkout_time: firstRow["وقت انصراف مبكر للمعلمين"] || '',
+        teacher_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المعلمين"]),
+        teacher_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمعلمين"]),
     };
 };
 
@@ -787,7 +801,15 @@ const App: React.FC = () => {
 
                 const settingsSheetData = dataContainer.setting;
                 if (settingsSheetData && Array.isArray(settingsSheetData)) {
-                    const processedSettings = processSettingsData(settingsSheetData as RawSettingData[]);
+                    const sanitizedSettingsRaw = settingsSheetData.map((row: any) => {
+                        const newRow: { [key: string]: any } = {};
+                        Object.keys(row).forEach(key => {
+                            const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
+                            newRow[cleanedKey] = row[key];
+                        });
+                        return newRow;
+                    });
+                    const processedSettings = processSettingsData(sanitizedSettingsRaw as RawSettingData[]);
                     setSettings(processedSettings);
                 }
 
@@ -1039,14 +1061,16 @@ const App: React.FC = () => {
         setSettings(data);
     
         try {
+            const updateUrl = `${API_URL}?action=updateSettings`;
             const payload = {
                 sheet: 'setting',
-                "الرقم": 1, // To identify the row to update
+                keyField: 'الرقم',
+                "الرقم": 1, 
                 "اليوم الافتراضي": data.default_student_count_day,
-                "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time,
-                "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time,
+                "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time ? `1899-12-30 ${data.teacher_late_checkin_time}:00` : '',
+                "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time ? `1899-12-30 ${data.teacher_early_checkout_time}:00` : '',
             };
-            await fetch(API_URL, {
+            await fetch(updateUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload),
