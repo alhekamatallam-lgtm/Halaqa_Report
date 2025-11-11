@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { ProcessedStudentData } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 
 const LoadingSpinner: React.FC = () => (
   <div className="flex items-center justify-center space-x-2 space-x-reverse">
@@ -143,6 +144,7 @@ const StudentFollowUpPage: React.FC<{ students: ProcessedStudentData[] }> = ({ s
                         <th className="px-4 py-3 text-center text-sm font-bold text-stone-700">التثبيت</th>
                         <th className="px-4 py-3 text-center text-sm font-bold text-stone-700">الحضور</th>
                         <th className="px-4 py-3 text-center text-sm font-bold text-stone-700">النقاط</th>
+                        <th className="px-4 py-3 text-center text-sm font-bold text-stone-700">تواصل</th>
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
@@ -160,6 +162,13 @@ const StudentFollowUpPage: React.FC<{ students: ProcessedStudentData[] }> = ({ s
                                 </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-center text-stone-800 font-bold">{s.totalPoints}</td>
+                            <td className="px-4 py-3 text-sm text-center">
+                                <WhatsAppButton 
+                                    phoneNumber={s.guardianMobile} 
+                                    studentName={s.studentName}
+                                    defaultMessage={`السلام عليكم ولي أمر الطالب/ ${s.studentName}، نود التواصل معكم بخصوص مستواه في الأسبوع: ${s.week}`}
+                                />
+                            </td>
                         </tr>
                     ))}
                 </tbody>

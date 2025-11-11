@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { ProcessedStudentData } from '../types';
 import { PrintIcon, ExcelIcon } from '../components/icons';
 import Pagination from '../components/Pagination';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -276,7 +277,16 @@ const StudentAbsenceReportPage: React.FC<{ students: ProcessedStudentData[] }> =
                                 <tr key={index} className="hover:bg-amber-50/50">
                                     <td className="px-4 py-3 text-sm text-center font-medium text-stone-900">{row.studentName}</td>
                                     <td className="px-4 py-3 text-sm text-center text-stone-600">{row.circle}</td>
-                                    <td className="px-4 py-3 text-sm text-center text-stone-600 font-mono">{row.guardianMobile || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-center text-stone-600">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <span className="font-mono">{row.guardianMobile || '-'}</span>
+                                            <WhatsAppButton
+                                                phoneNumber={row.guardianMobile}
+                                                studentName={row.studentName}
+                                                defaultMessage={`السلام عليكم ولي أمر الطالب/ ${row.studentName}، نلاحظ غياب ابنكم عن الحلقة، نرجو إفادتنا عن سبب الغياب.`}
+                                            />
+                                        </div>
+                                    </td>
                                     {activeFilters.days.map(day => (
                                         <td key={day} className="px-4 py-3 text-sm text-center font-semibold">
                                             <span className={row[day] === 'حاضر' ? 'text-green-600' : row[day] === 'غائب' ? 'text-red-600' : 'text-stone-400'}>

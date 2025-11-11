@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -1188,4 +1189,75 @@ const App: React.FC = () => {
             case 'circles':
                 return <CircleReportPage students={students} supervisors={supervisors} />;
             case 'general':
-                return <GeneralReportPage students
+                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
+            case 'dashboard':
+                return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
+            case 'dailyDashboard':
+                return <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
+            case 'notes':
+                return <NotesPage students={students} />;
+            case 'evaluation':
+                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} students={students} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} />;
+            case 'excellence':
+                return <ExcellencePage students={students} supervisors={supervisors} />;
+            case 'teacherAttendance':
+                return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} />;
+            case 'teacherAttendanceReport':
+                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+            case 'supervisorAttendance':
+                return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} />;
+            case 'supervisorAttendanceReport':
+                return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
+            case 'dailyStudents':
+                return <DailyStudentReportPage students={dailyStudents} />;
+            case 'dailyCircles':
+                return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
+            case 'exam':
+                return authenticatedUser && <ExamPage onSubmit={handlePostExam} isSubmitting={isSubmitting} students={registeredStudents} authenticatedUser={authenticatedUser} />;
+            case 'examReport':
+                return <ExamReportPage examData={examData} />;
+            case 'studentFollowUp':
+                return <StudentFollowUpPage students={students} />;
+            case 'studentAttendanceReport':
+                return <StudentAttendanceReportPage students={dailyStudents} />;
+            case 'studentAbsenceReport':
+                return <StudentAbsenceReportPage students={dailyStudents} />;
+            case 'settings':
+                return authenticatedUser && <SettingsPage settings={settings} onSave={handlePostSettings} isSubmitting={isSubmitting} dailyStudents={dailyStudents} />;
+            case 'teacherList':
+                return <TeacherListPage students={students} />;
+            default:
+                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
+        }
+    };
+    
+    return (
+        <div className="flex h-screen bg-stone-100" dir="rtl">
+            <Sidebar currentPage={currentPage} onNavigate={handleNavigation} isCollapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(prev => !prev)} />
+            <main className={`flex-1 flex flex-col overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'mr-20' : 'mr-64'}`}>
+                <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-6 border-b border-stone-200">
+                    <h1 className="text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
+                </header>
+                <div className="p-6">
+                    {renderPage()}
+                </div>
+            </main>
+            {showPasswordModal && (
+                <PasswordModal
+                    onSuccess={(user) => {
+                        setAuthenticatedUser(user);
+                        setShowPasswordModal(false);
+                    }}
+                    onClose={() => {
+                        setShowPasswordModal(false);
+                        setCurrentPage('general');
+                    }}
+                    supervisors={supervisors}
+                />
+            )}
+            <Notification notification={notification} onClose={() => setNotification(null)} />
+        </div>
+    );
+};
+
+export default App;
