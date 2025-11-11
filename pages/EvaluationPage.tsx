@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import type { EvalSubmissionPayload, ProcessedStudentData, EvalQuestion, ProcessedEvalResult } from '../types';
+import type { EvalSubmissionPayload, ProcessedStudentData, EvalQuestion, ProcessedEvalResult, ProcessedSettingsData } from '../types';
 import PastEvaluationsTable from '../components/PastEvaluationsTable';
 
 type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
@@ -7,14 +8,23 @@ type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: 
 interface EvaluationPageProps {
   onSubmit: (data: EvalSubmissionPayload) => Promise<void>;
   isSubmitting: boolean;
-  students: ProcessedStudentData[];
   authenticatedUser: AuthenticatedUser;
   evalQuestions: EvalQuestion[];
   evalResults: ProcessedEvalResult[];
   evalHeaderMap: Map<number, string>;
+  dailyStudents: ProcessedStudentData[];
+  settings: ProcessedSettingsData;
 }
 
-const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting, students, authenticatedUser, evalQuestions, evalResults, evalHeaderMap }) => {
+const parseDateFromDayString = (dayString: string): Date => {
+    const match = dayString.match(/(\d{2})-(\d{2})/);
+    if (!match) return new Date(0);
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    return new Date(new Date().getFullYear(), month - 1, day);
+};
+
+const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting, authenticatedUser, evalQuestions, evalResults, evalHeaderMap, dailyStudents, settings }) => {
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedCircle, setSelectedCircle] = useState('');
   const [scores, setScores] = useState<Record<number, number | ''>>({});
@@ -36,29 +46,38 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
       setError(null);
   };
 
-  const manageableStudents = useMemo(() => {
+  const manageableStudentsForDay = useMemo(() => {
+    const dayOptions = Array.from(new Set<string>(dailyStudents.map(s => s.day).filter((d): d is string => !!d)))
+        .sort((a, b) => parseDateFromDayString(b).getTime() - parseDateFromDayString(a).getTime());
+
+    const targetDay = settings.default_student_count_day || (dayOptions.length > 0 ? dayOptions[0] : null);
+
+    if (!targetDay) return [];
+
+    const studentsForTargetDay = dailyStudents.filter(s => s.day === targetDay);
+
     if (authenticatedUser.role === 'admin') {
-      return students;
+      return studentsForTargetDay;
     }
     const supervisorCircles = new Set(authenticatedUser.circles);
-    return students.filter(s => supervisorCircles.has(s.circle));
-  }, [students, authenticatedUser]);
+    return studentsForTargetDay.filter(s => supervisorCircles.has(s.circle));
+  }, [dailyStudents, settings, authenticatedUser]);
   
   const teachers = useMemo(() => {
-    const teacherSet = new Set<string>(manageableStudents.map(s => s.teacherName).filter(item => item));
+    const teacherSet = new Set<string>(manageableStudentsForDay.map(s => s.teacherName).filter(item => item));
     return Array.from(teacherSet).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [manageableStudents]);
+  }, [manageableStudentsForDay]);
 
   const availableCircles = useMemo(() => {
     if (!selectedTeacher) return [];
     const circleSet = new Set<string>(
-        manageableStudents
+        manageableStudentsForDay
             .filter(s => s.teacherName === selectedTeacher)
             .map(s => s.circle)
             .filter(item => item)
     );
     return Array.from(circleSet).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [manageableStudents, selectedTeacher]);
+  }, [manageableStudentsForDay, selectedTeacher]);
 
   const filteredPastEvaluations = useMemo(() => {
     if (authenticatedUser.role === 'admin') {

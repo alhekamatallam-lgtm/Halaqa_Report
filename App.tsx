@@ -1128,13 +1128,27 @@ const App: React.FC = () => {
 
     const handleNavigation = (page: Page) => {
         setInitialStudentFilter(null);
-        if ((page === 'evaluation' || page === 'exam' || page === 'settings') && !authenticatedUser) {
-            setCurrentPage(page);
-            setShowPasswordModal(true);
-        } else {
-            setCurrentPage(page);
-            setShowPasswordModal(false);
+        setInitialDailyStudentFilter(null);
+
+        // Unauthenticated access check
+        if (!authenticatedUser) {
+            if (page === 'evaluation' || page === 'exam' || page === 'settings') {
+                setCurrentPage(page);
+                setShowPasswordModal(true);
+                setIsMobileSidebarOpen(false);
+                return;
+            }
+        } else { // Authenticated user
+            // Role-based access check
+            if (page === 'settings' && authenticatedUser.role !== 'admin') {
+                setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
+                setIsMobileSidebarOpen(false);
+                return; // Block navigation
+            }
         }
+        
+        setCurrentPage(page);
+        setShowPasswordModal(false); // Make sure modal is closed if we navigate somewhere else
         setIsMobileSidebarOpen(false);
     };
 
@@ -1200,7 +1214,15 @@ const App: React.FC = () => {
             case 'notes':
                 return <NotesPage students={students} />;
             case 'evaluation':
-                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} students={students} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} />;
+                return authenticatedUser && <EvaluationPage 
+                    onSubmit={handlePostEvaluation} 
+                    isSubmitting={isSubmitting} 
+                    authenticatedUser={authenticatedUser} 
+                    evalQuestions={evalQuestions} 
+                    evalResults={evalResults} 
+                    evalHeaderMap={evalHeaderMap}
+                    dailyStudents={dailyStudents}
+                    settings={settings} />;
             case 'excellence':
                 return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'teacherAttendance':
@@ -1247,12 +1269,10 @@ const App: React.FC = () => {
             >
                 <Sidebar 
                     currentPage={currentPage} 
-                    onNavigate={(page) => {
-                        handleNavigation(page);
-                        setIsMobileSidebarOpen(false);
-                    }} 
+                    onNavigate={handleNavigation} 
                     isCollapsed={isSidebarCollapsed} 
                     onToggle={() => setIsSidebarCollapsed(prev => !prev)} 
+                    authenticatedUser={authenticatedUser}
                 />
             </div>
 
@@ -1280,10 +1300,18 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
+                        // After successful login, if the target page was settings and user is not admin, handle it
+                        if (currentPage === 'settings' && user.role !== 'admin') {
+                            setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
+                            setCurrentPage('general'); // Redirect to a default page
+                        }
                     }}
                     onClose={() => {
                         setShowPasswordModal(false);
-                        setCurrentPage('general');
+                        // If user closes modal without logging in, redirect from protected page
+                        if (['evaluation', 'exam', 'settings'].includes(currentPage)) {
+                            setCurrentPage('general');
+                        }
                     }}
                     supervisors={supervisors}
                 />

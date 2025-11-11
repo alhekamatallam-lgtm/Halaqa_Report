@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
     HomeIcon, 
@@ -17,6 +18,7 @@ import {
     IdentificationIcon,
 } from './icons';
 
+type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 interface SidebarProps {
@@ -24,6 +26,7 @@ interface SidebarProps {
   onNavigate: (page: Page) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  authenticatedUser: AuthenticatedUser | null;
 }
 
 const NavSection: React.FC<{ title: string; isCollapsed: boolean; children: React.ReactNode }> = ({ title, isCollapsed, children }) => (
@@ -57,7 +60,7 @@ const NavLink: React.FC<{
     </button>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCollapsed, onToggle }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCollapsed, onToggle, authenticatedUser }) => {
     return (
         <aside className={`flex-shrink-0 bg-stone-50 border-l border-stone-200 flex flex-col h-full print-hidden transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
             <div className={`h-24 flex items-center px-4 border-b border-stone-200 transition-all duration-300 ${isCollapsed ? 'justify-center' : 'justify-start'}`}>
@@ -106,9 +109,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                     <NavLink label="قائمة المعلمين" icon={<IdentificationIcon className="w-5 h-5" />} isActive={currentPage === 'teacherList'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherList')} />
                  </NavSection>
 
-                <NavSection title="الإدارة" isCollapsed={isCollapsed}>
-                    <NavLink label="الإعدادات" icon={<SettingsIcon className="w-5 h-5" />} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} onClick={() => onNavigate('settings')} />
-                </NavSection>
+                {authenticatedUser?.role === 'admin' && (
+                    <NavSection title="الإدارة" isCollapsed={isCollapsed}>
+                        <NavLink label="الإعدادات" icon={<SettingsIcon className="w-5 h-5" />} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} onClick={() => onNavigate('settings')} />
+                    </NavSection>
+                )}
 
             </nav>
             <div className="hidden lg:block p-3 border-t border-stone-200">
