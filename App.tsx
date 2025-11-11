@@ -1168,7 +1168,7 @@ const App: React.FC = () => {
         dashboard: 'متابعة الحلقات',
         dailyDashboard: 'متابعة الحلقات (يومي)',
         notes: 'ملاحظات الطلاب',
-        evaluation: `تقييم الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
+        evaluation: `زيارات الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
         excellence: 'تميز الحلقات',
         teacherAttendance: 'حضور وانصراف المعلمين',
         teacherAttendanceReport: 'تقرير حضور المعلمين',

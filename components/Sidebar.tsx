@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                  </NavSection>
 
                  <NavSection title="التقييم والاختبارات" isCollapsed={isCollapsed}>
-                    <NavLink label="تقييم الحلقة" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'evaluation'} isCollapsed={isCollapsed} onClick={() => onNavigate('evaluation')} />
+                    <NavLink label="زيارة معلم حلقة" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'evaluation'} isCollapsed={isCollapsed} onClick={() => onNavigate('evaluation')} />
                     <NavLink label="إدخال الاختبارات" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'exam'} isCollapsed={isCollapsed} onClick={() => onNavigate('exam')} />
                     <NavLink label="تقرير الاختبارات" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'examReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('examReport')} />
                  </NavSection>

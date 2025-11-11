@@ -49,7 +49,7 @@ const PastEvaluationsTable: React.FC<PastEvaluationsTableProps> = ({ results }) 
                 ) : (
                     <tr>
                     <td colSpan={3} className="px-6 py-12 text-center text-stone-500">
-                        لا توجد تقييمات سابقة لعرضها.
+                        لا توجد زيارات سابقة لعرضها.
                     </td>
                     </tr>
                 )}

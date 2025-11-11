@@ -107,7 +107,7 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
         className="bg-stone-50 rounded-2xl shadow-2xl w-full max-w-lg mx-auto p-8 transform transition-all"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-bold text-stone-800 text-center mb-6">إضافة تقييم جديد للحلقة</h3>
+        <h3 className="text-xl font-bold text-stone-800 text-center mb-6">إضافة زيارة جديدة للحلقة</h3>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
@@ -182,7 +182,7 @@ const EvaluationModal: React.FC<EvaluationModalProps> = ({ isOpen, onClose, onSu
               disabled={isSubmitting}
               className="w-full h-10 px-4 text-sm font-semibold text-stone-900 bg-amber-500 rounded-md shadow-sm hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'جاري الإرسال...' : 'إرسال التقييم'}
+              {isSubmitting ? 'جاري الإرسال...' : 'إرسال تقرير الزيارة'}
             </button>
           </div>
         </form>

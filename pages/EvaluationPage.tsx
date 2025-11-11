@@ -60,6 +60,14 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
     return Array.from(circleSet).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [manageableStudents, selectedTeacher]);
 
+  const filteredPastEvaluations = useMemo(() => {
+    if (authenticatedUser.role === 'admin') {
+      return evalResults;
+    }
+    const supervisorCircles = new Set(authenticatedUser.circles);
+    return evalResults.filter(result => supervisorCircles.has(result.circleName));
+  }, [evalResults, authenticatedUser]);
+
   useEffect(() => {
     setSelectedCircle('');
     setScores({});
@@ -117,7 +125,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
     <div className="space-y-8">
       <div className="bg-white p-8 rounded-2xl shadow-xl border border-stone-200">
         <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-stone-800">نموذج تقييم حلقة</h2>
+            <h2 className="text-2xl font-bold text-stone-800">نموذج زيارة معلم حلقة</h2>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -163,7 +171,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
                     <p className="text-3xl font-bold text-amber-600 mt-1">{currentTotalScore} <span className="text-lg text-stone-500">/ {maxTotalScore}</span></p>
                 </div>
                  <button type="submit" disabled={isSubmitting} className="h-12 px-8 text-base font-semibold text-stone-900 bg-amber-500 rounded-md shadow-sm hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed">
-                    {isSubmitting ? 'جاري الإرسال...' : 'إرسال التقييم'}
+                    {isSubmitting ? 'جاري الإرسال...' : 'إرسال تقرير الزيارة'}
                 </button>
             </div>
              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -171,8 +179,8 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-xl border border-stone-200">
-        <h3 className="text-xl font-bold text-stone-800 mb-4">التقييمات السابقة</h3>
-        <PastEvaluationsTable results={evalResults} />
+        <h3 className="text-xl font-bold text-stone-800 mb-4">الزيارات السابقة</h3>
+        <PastEvaluationsTable results={filteredPastEvaluations} />
       </div>
     </div>
   );

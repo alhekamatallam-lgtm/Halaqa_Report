@@ -75,7 +75,7 @@ export const Nav: React.FC<NavProps> = ({ currentPage, onNavigate }) => {
           onClick={() => onNavigate('notes')}
         />
         <NavButton
-          label="تقييم الحلقة"
+          label="زيارة معلم حلقة"
           isActive={currentPage === 'evaluation'}
           onClick={() => onNavigate('evaluation')}
         />
