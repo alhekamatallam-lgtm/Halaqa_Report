@@ -25,6 +25,7 @@ import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
 import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult } from './types';
+import { MenuIcon } from './components/icons';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbxnWt66AHyIyLK8PYm_nJnk4k4R-e3N1jVwa7WCshw3Lxd0OhljuYuALwQOQkTAqbI2/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
@@ -732,6 +733,7 @@ const App: React.FC = () => {
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     const asrTeachersInfo = useMemo(() => {
         return [...teachersInfo].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
@@ -1133,6 +1135,7 @@ const App: React.FC = () => {
             setCurrentPage(page);
             setShowPasswordModal(false);
         }
+        setIsMobileSidebarOpen(false);
     };
 
     const handleCircleSelect = (circleName: string) => {
@@ -1233,12 +1236,42 @@ const App: React.FC = () => {
     
     return (
         <div className="flex h-screen bg-stone-100" dir="rtl">
-            <Sidebar currentPage={currentPage} onNavigate={handleNavigation} isCollapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(prev => !prev)} />
-            <main className={`flex-1 flex flex-col overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'mr-20' : 'mr-64'}`}>
-                <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-6 border-b border-stone-200">
-                    <h1 className="text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
+            <div 
+                className={`
+                    print-hidden
+                    lg:flex lg:flex-shrink-0 
+                    fixed lg:relative inset-y-0 right-0 z-40
+                    transition-transform duration-300 ease-in-out
+                    ${isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0
+                `}
+            >
+                <Sidebar 
+                    currentPage={currentPage} 
+                    onNavigate={(page) => {
+                        handleNavigation(page);
+                        setIsMobileSidebarOpen(false);
+                    }} 
+                    isCollapsed={isSidebarCollapsed} 
+                    onToggle={() => setIsSidebarCollapsed(prev => !prev)} 
+                />
+            </div>
+
+            {isMobileSidebarOpen && (
+                 <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)} aria-hidden="true"></div>
+            )}
+
+            <main className={`flex-1 flex flex-col overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'lg:mr-20' : 'lg:mr-64'}`}>
+                <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-4 md:p-6 border-b border-stone-200 flex justify-between items-center">
+                    <h1 className="text-xl md:text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
+                    <button
+                        className="lg:hidden p-2 text-stone-600 hover:bg-stone-100 rounded-md"
+                        onClick={() => setIsMobileSidebarOpen(true)}
+                        aria-label="Open sidebar"
+                    >
+                        <MenuIcon className="w-6 h-6" />
+                    </button>
                 </header>
-                <div className="p-6">
+                <div className="p-4 md:p-6">
                     {renderPage()}
                 </div>
             </main>
