@@ -63,7 +63,6 @@ const parseDateFromDayString = (dayString: string): Date => {
 const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStudents: ProcessedStudentData[], settings: ProcessedSettingsData }> = ({ students, dailyStudents, settings }) => {
 
   const { stats, targetDayLabel } = useMemo(() => {
-    // FIX: Explicitly set the generic type for `new Set` to `string` to ensure correct type inference.
     const dayOptions = Array.from(new Set<string>(dailyStudents.map(s => s.day).filter((d): d is string => !!d)))
         .sort((a, b) => parseDateFromDayString(b).getTime() - parseDateFromDayString(a).getTime());
 
@@ -71,7 +70,7 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStude
     
     const dailyStudentsForTargetDay = targetDay ? dailyStudents.filter(s => s.day === targetDay) : [];
     
-    const totalStudentsForTargetDay = new Set(dailyStudentsForTargetDay.map(s => s.username)).size;
+    const totalStudentsForTargetDay = new Set(dailyStudentsForTargetDay.map(s => s.studentName)).size;
     const totalAttendanceForDay = dailyStudentsForTargetDay.reduce((sum, s) => sum + s.attendance, 0);
     const avgAttendanceForDay = dailyStudentsForTargetDay.length > 0 ? totalAttendanceForDay / dailyStudentsForTargetDay.length : 0;
 

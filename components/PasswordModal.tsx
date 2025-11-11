@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import type { SupervisorData } from '../types';
+import type { SupervisorData, ProductorData } from '../types';
 
-type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
+type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
 
 interface PasswordModalProps {
   onSuccess: (user: AuthenticatedUser) => void;
   onClose: () => void;
   supervisors: SupervisorData[];
+  productors: ProductorData[];
 }
 
-const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, supervisors }) => {
+const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, supervisors, productors }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -27,6 +28,16 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, super
         role: 'supervisor',
         name: foundSupervisor.supervisorName,
         circles: foundSupervisor.circles
+      });
+      return;
+    }
+
+    const foundProductor = productors.find(p => p.password === password);
+    if (foundProductor && foundProductor.role === 'معلم اختبارات') {
+      onSuccess({
+        role: 'exam_teacher',
+        name: foundProductor.name,
+        circles: []
       });
       return;
     }

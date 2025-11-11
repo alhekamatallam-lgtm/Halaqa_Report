@@ -270,3 +270,15 @@ export interface RawSettingData {
 }
 
 export type ProcessedSettingsData = Record<string, string>;
+
+export interface RawProductorData {
+  "role": string;
+  "name": string;
+  "pwd": string | number;
+}
+
+export interface ProductorData {
+  role: string;
+  name: string;
+  password: string;
+}

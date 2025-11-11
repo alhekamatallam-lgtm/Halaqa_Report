@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { ProcessedRegisteredStudentData, ExamSubmissionData } from '../types';
 
-type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
+type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
 
 interface ExamPageProps {
   onSubmit: (data: ExamSubmissionData) => Promise<void>;
@@ -20,7 +20,7 @@ const ExamPage: React.FC<ExamPageProps> = ({ onSubmit, isSubmitting, students, a
   const [error, setError] = useState<string | null>(null);
 
   const manageableStudents = useMemo(() => {
-    if (authenticatedUser.role === 'admin') {
+    if (authenticatedUser.role === 'admin' || authenticatedUser.role === 'exam_teacher') {
       return students;
     }
     const supervisorCircles = new Set(authenticatedUser.circles);

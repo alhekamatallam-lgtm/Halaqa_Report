@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
     HomeIcon, 
@@ -18,7 +17,7 @@ import {
     IdentificationIcon,
 } from './icons';
 
-type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
+type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 interface SidebarProps {
@@ -109,11 +108,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                     <NavLink label="قائمة المعلمين" icon={<IdentificationIcon className="w-5 h-5" />} isActive={currentPage === 'teacherList'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherList')} />
                  </NavSection>
 
-                {authenticatedUser?.role === 'admin' && (
-                    <NavSection title="الإدارة" isCollapsed={isCollapsed}>
-                        <NavLink label="الإعدادات" icon={<SettingsIcon className="w-5 h-5" />} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} onClick={() => onNavigate('settings')} />
-                    </NavSection>
-                )}
+                <NavSection title="الإدارة" isCollapsed={isCollapsed}>
+                    <NavLink label="الإعدادات" icon={<SettingsIcon className="w-5 h-5" />} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} onClick={() => onNavigate('settings')} />
+                </NavSection>
 
             </nav>
             <div className="hidden lg:block p-3 border-t border-stone-200">

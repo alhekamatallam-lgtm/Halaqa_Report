@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -24,7 +23,7 @@ import TeacherListPage from './pages/TeacherListPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData } from './types';
 import { MenuIcon } from './components/icons';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbxnWt66AHyIyLK8PYm_nJnk4k4R-e3N1jVwa7WCshw3Lxd0OhljuYuALwQOQkTAqbI2/exec';
@@ -149,6 +148,16 @@ const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
         supervisorName,
         ...data
     }));
+};
+
+const processProductorData = (data: RawProductorData[]): ProductorData[] => {
+    return data
+        .map(item => ({
+            role: (item['role'] || '').trim(),
+            name: (item['name'] || '').trim(),
+            password: String(item['pwd'] || '').trim(),
+        }))
+        .filter(item => item.role && item.name && item.password);
 };
 
 const processTeachersInfoData = (data: RawTeacherInfo[]): TeacherInfo[] => {
@@ -498,7 +507,7 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
 
         let currentKey: string | null = null;
         
-        if (username && studentName && week) {
+        if (username != null && studentName && week) {
             currentKey = `${username}-${week}`;
             lastKey = currentKey;
         } else {
@@ -512,7 +521,7 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
         const memPages = parseAchievement(item["أوجه الحفظ"]);
         const revPages = parseAchievement(item["أوجه المراجه"]);
         const conPages = parseAchievement(item["أوجه التثبيت"]);
-        const points = item["اجمالي النقاط"] || 0;
+        const points = Number(item["اجمالي النقاط"]) || 0;
         const attendance = parsePercentage(item["نسبة الحضور"]);
         const memLessons = normalize(item["دروس الحفظ"]);
         const revLessons = normalize(item["دروس المراجعة"]);
@@ -540,7 +549,7 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
                     : revLessons;
             }
         } else {
-            if (!studentName || !username || !week) continue;
+            if (!studentName || username == null || !week) continue;
 
             const circle = normalize(item["الحلقة"]);
             const isTabyan = circle.includes('التبيان');
@@ -597,8 +606,10 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
 
     return data.map((item, index): ProcessedStudentData | null => {
         const studentName = normalize(item["الطالب"]);
-        const username = item["اسم المستخدم"];
-        if (!studentName || !username) return null;
+        const usernameRaw = item["اسم المستخدم"];
+        if (!studentName || usernameRaw == null) return null;
+
+        const username = Number(usernameRaw);
         
         const circle = normalize(item["الحلقة"]);
         const isTabyan = circle.includes('التبيان');
@@ -636,7 +647,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             teacherName: normalize(item["اسم المعلم"]),
             program: normalize(item["البرنامج"]),
             attendance: parsePercentage(item["نسبة الحضور"]),
-            totalPoints: item["اجمالي النقاط"] || 0,
+            totalPoints: Number(item["اجمالي النقاط"]) || 0,
             guardianMobile: normalize(item["جوال ولي الأمر"]),
             day: day,
         };
@@ -704,7 +715,7 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
 };
 
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
-type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
+type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
@@ -715,6 +726,7 @@ const App: React.FC = () => {
     const [examData, setExamData] = useState<ProcessedExamData[]>([]);
     const [registeredStudents, setRegisteredStudents] = useState<ProcessedRegisteredStudentData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
+    const [productors, setProductors] = useState<ProductorData[]>([]);
     const [teachersInfo, setTeachersInfo] = useState<TeacherInfo[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
     const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
@@ -821,6 +833,12 @@ const App: React.FC = () => {
                     }
                 }
 
+                const productorSheetData = dataContainer.productor;
+                if (productorSheetData && Array.isArray(productorSheetData)) {
+                    const processedProductors = processProductorData(productorSheetData as RawProductorData[]);
+                    setProductors(processedProductors);
+                }
+
                 let currentAsrTeachers: TeacherInfo[] = [];
                 const teachersSheetData = dataContainer.teachers;
                 if (teachersSheetData && Array.isArray(teachersSheetData)) {
@@ -863,6 +881,19 @@ const App: React.FC = () => {
 
         fetchData();
     }, []);
+
+    useEffect(() => {
+        // This effect runs after a successful login to authorize the user for the page they intended to visit.
+        if (authenticatedUser) {
+            if (currentPage === 'settings' && authenticatedUser.role !== 'admin') {
+                setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
+                setCurrentPage('general');
+            } else if (currentPage === 'exam' && !['admin', 'exam_teacher'].includes(authenticatedUser.role)) {
+                setNotification({ message: 'هذه الصفحة مخصصة لمعلمي الاختبارات والإدارة فقط.', type: 'error' });
+                setCurrentPage('general');
+            }
+        }
+    }, [authenticatedUser, currentPage]);
 
     const handlePostEvaluation = async (data: EvalSubmissionPayload) => {
         setIsSubmitting(true);
@@ -1145,6 +1176,11 @@ const App: React.FC = () => {
                 setIsMobileSidebarOpen(false);
                 return; // Block navigation
             }
+            if (page === 'exam' && !['admin', 'exam_teacher'].includes(authenticatedUser.role)) {
+                setNotification({ message: 'هذه الصفحة مخصصة لمعلمي الاختبارات والإدارة فقط.', type: 'error' });
+                setIsMobileSidebarOpen(false);
+                return;
+            }
         }
         
         setCurrentPage(page);
@@ -1228,7 +1264,7 @@ const App: React.FC = () => {
             case 'teacherAttendance':
                 return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} />;
             case 'teacherAttendanceReport':
-                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} />;
+                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} allTeachers={asrTeachersInfo} />;
             case 'supervisorAttendance':
                 return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} />;
             case 'supervisorAttendanceReport':
@@ -1300,11 +1336,6 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
-                        // After successful login, if the target page was settings and user is not admin, handle it
-                        if (currentPage === 'settings' && user.role !== 'admin') {
-                            setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
-                            setCurrentPage('general'); // Redirect to a default page
-                        }
                     }}
                     onClose={() => {
                         setShowPasswordModal(false);
@@ -1314,6 +1345,7 @@ const App: React.FC = () => {
                         }
                     }}
                     supervisors={supervisors}
+                    productors={productors}
                 />
             )}
             <Notification notification={notification} onClose={() => setNotification(null)} />

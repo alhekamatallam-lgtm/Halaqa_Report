@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TeacherAttendanceReportEntry, TeacherAttendanceSummaryEntry } from '../types';
+import type { TeacherAttendanceReportEntry, TeacherAttendanceSummaryEntry, TeacherInfo } from '../types';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import { PrintIcon, ExcelIcon } from '../components/icons';
 import { ProgressBar } from '../components/ProgressBar';
@@ -9,9 +9,10 @@ const ITEMS_PER_PAGE = 10;
 
 interface TeacherAttendanceReportPageProps {
   reportData: TeacherAttendanceReportEntry[];
+  allTeachers: TeacherInfo[];
 }
 
-const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = ({ reportData }) => {
+const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = ({ reportData, allTeachers }) => {
   const [activeTab, setActiveTab] = React.useState<'detailed' | 'summary'>('detailed');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -25,9 +26,8 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
   }, [startDate, endDate, selectedTeacher, searchQuery, activeTab]);
 
   const teachers = React.useMemo(() => {
-    const teacherSet = new Set<string>(reportData.map(r => r.teacherName));
-    return Array.from<string>(teacherSet).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [reportData]);
+    return allTeachers.map(t => t.name);
+  }, [allTeachers]);
 
   const filteredData = React.useMemo(() => {
     return reportData.filter(item => {
