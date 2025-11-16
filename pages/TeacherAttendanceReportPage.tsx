@@ -1,48 +1,56 @@
+
 import React from 'react';
-import type { TeacherAttendanceReportEntry, TeacherAttendanceSummaryEntry, TeacherInfo } from '../types';
+import type { CombinedTeacherAttendanceEntry, TeacherAttendanceSummaryEntry } from '../types';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
 import { PrintIcon, ExcelIcon } from '../components/icons';
 import { ProgressBar } from '../components/ProgressBar';
 import Pagination from '../components/Pagination';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 interface TeacherAttendanceReportPageProps {
-  reportData: TeacherAttendanceReportEntry[];
-  allTeachers: TeacherInfo[];
+  reportData: CombinedTeacherAttendanceEntry[];
 }
 
-const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = ({ reportData, allTeachers }) => {
+const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = ({ reportData }) => {
   const [activeTab, setActiveTab] = React.useState<'detailed' | 'summary'>('detailed');
-  const [startDate, setStartDate] = React.useState('');
-  const [endDate, setEndDate] = React.useState('');
-  const [selectedTeacher, setSelectedTeacher] = React.useState('');
-  const [searchQuery, setSearchQuery] = React.useState('');
   const [modalData, setModalData] = React.useState<{ title: string; dates: string[] } | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [selectedTeacher, setSelectedTeacher] = React.useState('');
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate, setEndDate] = React.useState('');
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, selectedTeacher, searchQuery, activeTab]);
+  }, [activeTab, selectedTeacher, startDate, endDate]);
 
-  const teachers = React.useMemo(() => {
-    return allTeachers.map(t => t.name);
-  }, [allTeachers]);
-
+  const teacherOptions = React.useMemo(() => {
+    const names = new Set(reportData.map(item => item.teacherName));
+    return Array.from(names).sort((a: string, b: string) => a.localeCompare(b, 'ar'));
+  }, [reportData]);
+  
   const filteredData = React.useMemo(() => {
     return reportData.filter(item => {
-      const itemDate = new Date(item.date + 'T00:00:00Z');
-      const start = startDate ? new Date(startDate + 'T00:00:00Z') : null;
-      const end = endDate ? new Date(endDate + 'T00:00:00Z') : null;
-
-      if (start && itemDate < start) return false;
-      if (end && itemDate > end) return false;
-      if (selectedTeacher && item.teacherName !== selectedTeacher) return false;
-      if (searchQuery && !item.teacherName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const teacherMatch = !selectedTeacher || item.teacherName === selectedTeacher;
       
-      return true;
+      if (!item.date) return false;
+      const itemDate = new Date(item.date);
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      let dateMatch = true;
+      if (start) {
+          start.setHours(0, 0, 0, 0);
+          if (itemDate < start) dateMatch = false;
+      }
+      if (end) {
+          end.setHours(23, 59, 59, 999);
+          if (itemDate > end) dateMatch = false;
+      }
+      
+      return teacherMatch && dateMatch;
     });
-  }, [reportData, startDate, endDate, selectedTeacher, searchQuery]);
+  }, [reportData, selectedTeacher, startDate, endDate]);
 
   const summaryData: TeacherAttendanceSummaryEntry[] = React.useMemo(() => {
     const summaryMap = new Map<string, { presentDates: Set<string>; absentDates: Set<string> }>();
@@ -75,7 +83,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
         })
         .sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'ar'));
   }, [filteredData]);
-
+  
   const paginatedDetailedData = React.useMemo(() => {
     return filteredData.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
@@ -92,12 +100,6 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
   }, [summaryData, currentPage]);
   const totalSummaryPages = Math.ceil(summaryData.length / ITEMS_PER_PAGE);
 
-  const handleClearFilters = () => {
-    setStartDate('');
-    setEndDate('');
-    setSelectedTeacher('');
-    setSearchQuery('');
-  };
   
   const handleShowDates = (teacherName: string, type: 'present' | 'absent') => {
     const title = type === 'present' 
@@ -121,8 +123,13 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
     setModalData({ title, dates });
   };
 
+  const handleClearFilters = () => {
+      setSelectedTeacher('');
+      setStartDate('');
+      setEndDate('');
+  };
+
   const handleExport = () => {
-    // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
     const XLSX = (window as any).XLSX;
     let dataToExport;
     let fileName;
@@ -134,6 +141,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
         'التاريخ': new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC' }),
         'وقت الحضور': item.checkInTime || 'غائب',
         'وقت الانصراف': item.checkOutTime || '',
+        'ملاحظات': item.notes || '',
       }));
       fileName = 'تقرير_حضور_المعلمين_التفصيلي.xlsx';
       sheetName = 'التقرير التفصيلي';
@@ -153,7 +161,7 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     XLSX.writeFile(wb, fileName);
   };
-
+  
   const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => (
     <button
       onClick={onClick}
@@ -167,73 +175,40 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
       {isActive && <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-500 rounded-t-full"></div>}
     </button>
   );
-
+  
   const printTitle = `تقرير حضور المعلمين - ${new Date().toLocaleDateString('ar-EG')}`;
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-xl border border-stone-200 print-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
-          <div className="md:col-span-1">
+      <div className="flex justify-end print-hidden gap-2">
+        <button onClick={handleExport} className="w-auto h-10 px-4 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2">
+            <ExcelIcon /> تصدير لإكسل
+        </button>
+        <button onClick={() => window.print()} className="w-auto h-10 px-4 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2">
+            <PrintIcon /> طباعة
+        </button>
+      </div>
+      
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-stone-200 print-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div>
+            <label htmlFor="teacher-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة حسب المعلم</label>
+             <select id="teacher-filter" value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md">
+                <option value="">كل المعلمين</option>
+                {teacherOptions.map(teacher => <option key={teacher} value={teacher}>{teacher}</option>)}
+              </select>
+          </div>
+          <div>
             <label htmlFor="start-date" className="block text-sm font-medium text-stone-700 mb-2">من تاريخ</label>
-            <input
-              type="date"
-              id="start-date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-            />
+            <input type="date" id="start-date" value={startDate} onChange={e => setStartDate(e.target.value)} className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"/>
           </div>
-          <div className="md:col-span-1">
+          <div>
             <label htmlFor="end-date" className="block text-sm font-medium text-stone-700 mb-2">إلى تاريخ</label>
-            <input
-              type="date"
-              id="end-date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-            />
+            <input type="date" id="end-date" value={endDate} onChange={e => setEndDate(e.target.value)} className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"/>
           </div>
-           <div className="md:col-span-1">
-             <label htmlFor="teacher-search" className="block text-sm font-medium text-stone-700 mb-2">بحث بالمعلم</label>
-             <input type="text" id="teacher-search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="اسم المعلم..." className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md" />
-        </div>
-          <div className="md:col-span-1">
-            <label htmlFor="teacher-filter" className="block text-sm font-medium text-stone-700 mb-2">فلترة بالمعلم</label>
-            <select
-              id="teacher-filter"
-              value={selectedTeacher}
-              onChange={e => setSelectedTeacher(e.target.value)}
-              className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-            >
-              <option value="">كل المعلمين</option>
-              {teachers.map(teacher => (
-                <option key={teacher} value={teacher}>{teacher}</option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-1">
-            <button
-              onClick={handleClearFilters}
-              className="w-full h-10 px-4 text-sm font-semibold text-stone-700 bg-stone-200 rounded-md shadow-sm hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-400 transition-all duration-150"
-            >
+          <div>
+            <button onClick={handleClearFilters} className="w-full h-10 px-4 text-sm font-semibold text-stone-700 bg-stone-200 rounded-md shadow-sm hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-400 transition-all duration-150">
               مسح الفلتر
-            </button>
-          </div>
-          <div className="md:col-span-2 grid grid-cols-2 gap-2">
-            <button
-                onClick={handleExport}
-                className="w-full h-10 px-4 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2"
-            >
-                <ExcelIcon />
-                تصدير لإكسل
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="w-full h-10 px-4 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"
-            >
-              <PrintIcon />
-              طباعة
             </button>
           </div>
         </div>
@@ -256,49 +231,46 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">التاريخ</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">وقت الحضور</th>
                     <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">وقت الانصراف</th>
+                    <th scope="col" className="px-6 py-4 text-center text-sm font-bold text-stone-700 uppercase tracking-wider">ملاحظات</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
                   {paginatedDetailedData.length > 0 ? (
-                    paginatedDetailedData.map((item, index) => {
+                    paginatedDetailedData.map((item) => {
                       const isAbsent = item.checkInTime === null && item.checkOutTime === null;
-                      const rowClass = isAbsent ? 'bg-red-50/70 absent-row-print' : (index % 2 === 0 ? 'bg-white' : 'bg-stone-50/70');
-
+                      const rowClass = isAbsent ? 'bg-red-50/70 absent-row-print' : 'hover:bg-amber-100/60';
                       return (
-                        <tr key={`${item.date}-${item.teacherName}-${index}`} className={`${rowClass} hover:bg-amber-100/60 transition-all`}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.teacherName}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })}</td>
-                          {isAbsent ? (
-                            <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
-                              غائب
-                            </td>
-                          ) : (
-                            <>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkInTime || '---'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center font-mono">{item.checkOutTime || '---'}</td>
-                            </>
-                          )}
+                        <tr key={item.id} className={`${rowClass} transition-all`}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900 text-center">{item.teacherName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                            {isAbsent ? (
+                                <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-700 text-center">
+                                غائب
+                                </td>
+                            ) : (
+                                <>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-700 text-center font-mono">{item.checkInTime || '---'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-700 text-center font-mono">{item.checkOutTime || '---'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-500 text-center">{item.notes || '---'}</td>
+                                </>
+                            )}
                         </tr>
-                      );
+                      )
                     })
                   ) : (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
-                        لا توجد بيانات تطابق الفلتر المحدد.
-                      </td>
-                    </tr>
+                    <tr><td colSpan={5} className="px-6 py-12 text-center text-stone-500">لا توجد بيانات تطابق الفلتر المحدد.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="p-4">
+             <div className="p-4">
               <Pagination currentPage={currentPage} totalPages={totalDetailedPages} onPageChange={setCurrentPage} />
             </div>
           </div>
         )}
 
         {activeTab === 'summary' && (
-          <div>
+           <div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-stone-200">
                 <thead className="bg-stone-100 sticky top-[49px] z-5">
@@ -343,14 +315,14 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
                   ) : (
                     <tr>
                       <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
-                        لا توجد بيانات تطابق الفلتر المحدد.
+                        لا توجد بيانات لعرضها.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="p-4">
+             <div className="p-4">
                <Pagination currentPage={currentPage} totalPages={totalSummaryPages} onPageChange={setCurrentPage} />
             </div>
           </div>

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -23,11 +25,23 @@ import TeacherListPage from './pages/TeacherListPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherAttendanceReportEntry, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData, CombinedTeacherAttendanceEntry } from './types';
 import { MenuIcon } from './components/icons';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbxnWt66AHyIyLK8PYm_nJnk4k4R-e3N1jVwa7WCshw3Lxd0OhljuYuALwQOQkTAqbI2/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzUUEJKndeH57my0QQd7UstCbsU6BftKOqR6vb83QkHN9tkGT3MTKuc16Zs8U43P8b1/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
+
+const normalizeArabicForMatch = (text: string) => {
+    if (!text) return '';
+    return text
+        .normalize('NFC')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+        .replace(/\s+/g, ' ') // Standardize whitespace
+        .replace(/[إأآا]/g, 'ا') // Unify Alif
+        .replace(/[يى]/g, 'ي')     // Unify Ya
+        .replace(/ة/g, 'ه')       // Unify Ta Marbuta
+        .trim();
+};
 
 const parseAchievement = (value: any): Achievement => {
   const strValue = String(value || '');
@@ -126,27 +140,30 @@ const processEvalResultsData = (
 
 
 const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
-    const supervisorMap = new Map<string, { password: string; circles: string[] }>();
+    const supervisorMap = new Map<string, { supervisorName: string; password: string; circles: string[] }>();
     data.forEach(item => {
+        const supervisorId = (item['id'] || '').trim();
         const supervisorName = (item['المشرف'] || '').trim();
         const password = (item['كلمة المرور'] || '').trim();
         const circle = (item['الحلقة'] || '').trim();
 
-        if (supervisorName && password) {
-            if (!supervisorMap.has(supervisorName)) {
-                supervisorMap.set(supervisorName, { password, circles: [] });
+        if (supervisorId && supervisorName && password) {
+            if (!supervisorMap.has(supervisorId)) {
+                supervisorMap.set(supervisorId, { supervisorName, password, circles: [] });
             }
             
-            const supervisorEntry = supervisorMap.get(supervisorName)!;
+            const supervisorEntry = supervisorMap.get(supervisorId)!;
             if (circle && !supervisorEntry.circles.includes(circle)) {
                 supervisorEntry.circles.push(circle);
             }
         }
     });
 
-    return Array.from(supervisorMap.entries()).map(([supervisorName, data]) => ({
-        supervisorName,
-        ...data
+    return Array.from(supervisorMap.entries()).map(([id, data]) => ({
+        id,
+        supervisorName: data.supervisorName,
+        password: data.password,
+        circles: data.circles,
     }));
 };
 
@@ -160,38 +177,108 @@ const processProductorData = (data: RawProductorData[]): ProductorData[] => {
         .filter(item => item.role && item.name && item.password);
 };
 
-const processTeachersInfoData = (data: RawTeacherInfo[]): TeacherInfo[] => {
-    return data
-        .filter(item => (item['وقت الحلقة'] || '').trim() === 'العصر')
-        .map(item => ({
-            name: (item['المعلم'] || '').trim(),
-            circle: (item['الحلقات'] || '').trim()
-        }))
-        .filter(item => item.name && item.circle);
+const getTimestampFromItem = (item: RawTeacherAttendanceData | RawSupervisorAttendanceData): Date | null => {
+    let timestamp: Date | null = null;
+    const dateProcessStr = item['تاريخ العملية'];
+    const timeProcessStr = item['وقت العملية'];
+
+    if (dateProcessStr && timeProcessStr) {
+        try {
+            const dateMatch = dateProcessStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (!dateMatch) throw new Error("Invalid date format");
+            
+            const [, year, month, day] = dateMatch.map(Number);
+
+            let timeString = timeProcessStr.trim();
+            let isPM = false;
+            
+            if (timeString.includes('م')) {
+                isPM = true;
+                timeString = timeString.replace(/م/g, '').trim();
+            } else if (timeString.includes('ص')) {
+                timeString = timeString.replace(/ص/g, '').trim();
+            }
+
+            // Handle dummy date like "1899-12-30 13:55:36"
+            if (timeString.includes(' ')) {
+                timeString = timeString.split(' ').pop() || '';
+            }
+
+            const timeParts = timeString.split(':').map(Number);
+            if (timeParts.length < 2 || timeParts.some(isNaN)) {
+                 throw new Error("Invalid time format");
+            }
+
+            let [hour, minute, second = 0] = timeParts;
+
+            if (isPM && hour < 12) {
+                hour += 12;
+            } else if (!isPM && hour === 12) { // Handle 12 AM (midnight) case
+                hour = 0;
+            }
+
+            // Create a date object assuming the parts are in UTC
+            const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+            
+            // The time is for Riyadh (UTC+3). So, the actual UTC time is 3 hours earlier.
+            // Subtract 3 hours to get the correct UTC timestamp.
+            utcDate.setUTCHours(utcDate.getUTCHours() - 3);
+
+            if (!isNaN(utcDate.getTime())) {
+                timestamp = utcDate;
+            }
+
+        } catch (e) {
+            console.error("Error parsing new date/time:", item, e);
+            // Fall through to fallback
+        }
+    }
+    
+    // Fallback to the original `time` field
+    if (!timestamp && item.time) {
+        const ts = new Date(item.time);
+        if (!isNaN(ts.getTime())) {
+            timestamp = ts;
+        }
+    }
+    
+    return timestamp;
 };
 
-const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeacherNames: string[]): TeacherDailyAttendance[] => {
+const processTeachersInfoData = (data: RawTeacherInfo[]): TeacherInfo[] => {
+    return data
+        .map(item => ({
+            id: item['teacher_id'],
+            name: normalizeArabicForMatch(item['المعلم'] || ''),
+            circle: (item['الحلقات'] || '').trim()
+        }))
+        .filter(item => item.id != null && item.name && item.circle);
+};
+
+const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeachers: TeacherInfo[]): TeacherDailyAttendance[] => {
     const timeZone = 'Asia/Riyadh';
-    const todayRiyadh = new Date(new Date().toLocaleString('en-US', { timeZone }));
-    todayRiyadh.setHours(0, 0, 0, 0);
+    const todayRiyadhStr = new Date().toLocaleDateString('en-CA', { timeZone });
 
-    const teacherRecords = new Map<string, { checkIn: Date | null, checkOut: Date | null, checkInNote: string | null, checkOutNote: string | null }>();
+    const teacherRecords = new Map<number, { teacherName: string, checkIn: Date | null, checkOut: Date | null, checkInNote: string | null, checkOutNote: string | null }>();
 
-    allTeacherNames.forEach(name => {
-        teacherRecords.set(name, { checkIn: null, checkOut: null, checkInNote: null, checkOutNote: null });
+    allTeachers.forEach(t => {
+        teacherRecords.set(t.id, { teacherName: t.name, checkIn: null, checkOut: null, checkInNote: null, checkOutNote: null });
     });
 
     data.forEach(item => {
-        const timestamp = new Date(item['time']);
-        const itemDateRiyadh = new Date(timestamp.toLocaleString('en-US', { timeZone }));
-        itemDateRiyadh.setHours(0, 0, 0, 0);
+        const teacherId = item.teacher_id;
+        if (teacherId == null) return;
+
+        const timestamp = getTimestampFromItem(item);
+        if (!timestamp) return;
         
-        const teacherName = (item['name'] || '').trim();
+        const itemDateRiyadhStr = timestamp.toLocaleDateString('en-CA', { timeZone });
+        
         const status = (item.status || '').trim();
         const note = (item['ملاحظات'] || '').trim();
 
-        if (itemDateRiyadh.getTime() === todayRiyadh.getTime() && teacherRecords.has(teacherName)) {
-            const record = teacherRecords.get(teacherName)!;
+        if (itemDateRiyadhStr === todayRiyadhStr && teacherRecords.has(teacherId)) {
+            const record = teacherRecords.get(teacherId)!;
 
             if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
                 if (!record.checkIn || timestamp < record.checkIn) {
@@ -207,51 +294,50 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
         }
     });
 
-    return Array.from(teacherRecords.entries()).map(([teacherName, times]) => {
+    return Array.from(teacherRecords.values()).map(record => {
         let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
-        if (times.checkIn && times.checkOut) {
+        if (record.checkIn && record.checkOut) {
             status = 'مكتمل الحضور';
-        } else if (times.checkIn) {
+        } else if (record.checkIn) {
             status = 'حاضر';
         }
         
-        const combinedNotes = [times.checkInNote, times.checkOutNote].filter(Boolean).join('، ');
+        const combinedNotes = [record.checkInNote, record.checkOutNote].filter(Boolean).join('، ');
         
         return {
-            teacherName,
-            checkIn: times.checkIn,
-            checkOut: times.checkOut,
+            teacherName: record.teacherName,
+            checkIn: record.checkIn,
+            checkOut: record.checkOut,
             status,
             notes: combinedNotes || undefined,
         };
     });
 };
 
-const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], allSupervisorNames: string[]): SupervisorDailyAttendance[] => {
+const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], allSupervisors: SupervisorData[]): SupervisorDailyAttendance[] => {
     const timeZone = 'Asia/Riyadh';
-    const todayRiyadh = new Date(new Date().toLocaleString('en-US', { timeZone }));
-    todayRiyadh.setHours(0, 0, 0, 0);
+    const todayRiyadhStr = new Date().toLocaleDateString('en-CA', { timeZone });
 
-    const supervisorRecords = new Map<string, { checkIn: Date | null, checkOut: Date | null }>();
+    const supervisorRecords = new Map<string, { supervisorName: string, checkIn: Date | null, checkOut: Date | null }>();
 
-    allSupervisorNames.forEach(name => {
-        supervisorRecords.set(name, { checkIn: null, checkOut: null });
+    allSupervisors.forEach(s => {
+        supervisorRecords.set(s.id, { supervisorName: s.supervisorName, checkIn: null, checkOut: null });
     });
 
     data.forEach(item => {
-        const timestamp = new Date(item['time']);
-        if (isNaN(timestamp.getTime())) return;
+        const supervisorId = item.id;
+        if (!supervisorId) return;
 
-        const itemDateRiyadh = new Date(timestamp.toLocaleString('en-US', { timeZone }));
-        itemDateRiyadh.setHours(0, 0, 0, 0);
-        
-        const supervisorName = (item['name'] || '').trim();
+        const timestamp = getTimestampFromItem(item);
+        if (!timestamp) return;
+
+        const itemDateRiyadhStr = timestamp.toLocaleDateString('en-CA', { timeZone });
         const status = (item.status || '').trim();
 
-        if (itemDateRiyadh.getTime() === todayRiyadh.getTime() && supervisorRecords.has(supervisorName)) {
-            const record = supervisorRecords.get(supervisorName)!;
+        if (itemDateRiyadhStr === todayRiyadhStr && supervisorRecords.has(supervisorId)) {
+            const record = supervisorRecords.get(supervisorId)!;
 
-            if (status === 'حضور' || status === 'الحضور') {
+            if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
                 if (!record.checkIn || timestamp < record.checkIn) {
                     record.checkIn = timestamp;
                 }
@@ -263,26 +349,31 @@ const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], al
         }
     });
 
-    return Array.from(supervisorRecords.entries()).map(([supervisorName, times]) => {
+    return Array.from(supervisorRecords.values()).map(record => {
         let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
-        if (times.checkIn && times.checkOut) {
+        if (record.checkIn && record.checkOut) {
             status = 'مكتمل الحضور';
-        } else if (times.checkIn) {
+        } else if (record.checkIn) {
             status = 'حاضر';
         }
         
         return {
-            supervisorName,
-            checkIn: times.checkIn,
-            checkOut: times.checkOut,
+            supervisorName: record.supervisorName,
+            checkIn: record.checkIn,
+            checkOut: record.checkOut,
             status,
         };
     });
 };
 
-const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], allTeachers: string[]): TeacherAttendanceReportEntry[] => {
+const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], teachersInfo: TeacherInfo[]): CombinedTeacherAttendanceEntry[] => {
     const timeZone = 'Asia/Riyadh';
-    
+
+    const teacherIdToNameMap = new Map<number, string>();
+    teachersInfo.forEach(t => teacherIdToNameMap.set(t.id, t.name));
+
+    const allTeacherIdsForReport = new Set(teachersInfo.map(t => t.id));
+
     const toRiyadhDateString = (date: Date): string => {
         const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(date);
         const year = parts.find(p => p.type === 'year')?.value;
@@ -291,51 +382,55 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         return `${year}-${month}-${day}`;
     };
 
-    const timeFormatOptions: Intl.DateTimeFormatOptions = {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        timeZone,
-    };
-    
-    const dailyRecords = new Map<string, { teacherName: string; date: string; checkIn: Date | null; checkOut: Date | null }>();
+    const dailyRecords = new Map<string, {
+        teacherId: number;
+        date: string;
+        checkIns: Date[];
+        checkOuts: Date[];
+        notes: Set<string>;
+    }>();
 
     data.forEach(item => {
-        const timestamp = new Date(item.time);
-        if (isNaN(timestamp.getTime())) return;
-        
-        const teacherName = (item.name || '').trim();
-        const status = (item.status || '').trim();
-        if (!teacherName) return;
+        const teacherId = item.teacher_id;
+        if (teacherId == null) return;
+
+        const timestamp = getTimestampFromItem(item);
+        if (!timestamp) return;
 
         const dateString = toRiyadhDateString(timestamp);
-        const mapKey = `${dateString}/${teacherName}`;
+        const mapKey = `${teacherId}/${dateString}`;
 
-        let entry = dailyRecords.get(mapKey);
-        if (!entry) {
-            entry = { teacherName, date: dateString, checkIn: null, checkOut: null };
-            dailyRecords.set(mapKey, entry);
+        if (!dailyRecords.has(mapKey)) {
+            dailyRecords.set(mapKey, {
+                teacherId,
+                date: dateString,
+                checkIns: [],
+                checkOuts: [],
+                notes: new Set(),
+            });
         }
-        
+
+        const record = dailyRecords.get(mapKey)!;
+        const note = (item['ملاحظات'] || '').trim();
+        if (note) {
+            record.notes.add(note);
+        }
+
+        const status = (item.status || '').trim();
         if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
-            if (!entry.checkIn || timestamp < entry.checkIn) {
-                entry.checkIn = timestamp;
-            }
+            record.checkIns.push(timestamp);
         } else if (status === 'انصراف') {
-            if (!entry.checkOut || timestamp > entry.checkOut) {
-                entry.checkOut = timestamp;
-            }
+            record.checkOuts.push(timestamp);
         }
     });
 
-    if (data.length > 0 || allTeachers.length > 0) {
+    if (data.length > 0 || allTeacherIdsForReport.size > 0) {
         let minDate: Date | null = null;
         let maxDate: Date | null = null;
 
         data.forEach(item => {
-            const timestamp = new Date(item.time);
-            if (isNaN(timestamp.getTime())) return;
+            const timestamp = getTimestampFromItem(item);
+            if (!timestamp || isNaN(timestamp.getTime())) return;
             if (!minDate || timestamp < minDate) minDate = timestamp;
             if (!maxDate || timestamp > maxDate) maxDate = timestamp;
         });
@@ -344,7 +439,9 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         if (!maxDate || today > maxDate) {
             maxDate = today;
         }
+        
         if (minDate && maxDate) {
+            // Weekends: Thursday (4), Friday (5), Saturday (6)
             const workingDays = [0, 1, 2, 3]; // Sunday to Wednesday
             let currentDate = new Date(minDate);
             currentDate.setHours(0, 0, 0, 0);
@@ -352,14 +449,15 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
             while (currentDate <= maxDate) {
                 if (workingDays.includes(currentDate.getDay())) {
                     const dateString = toRiyadhDateString(currentDate);
-                    allTeachers.forEach(teacherName => {
-                        const mapKey = `${dateString}/${teacherName}`;
+                    allTeacherIdsForReport.forEach(teacherId => {
+                        const mapKey = `${teacherId}/${dateString}`;
                         if (!dailyRecords.has(mapKey)) {
                             dailyRecords.set(mapKey, {
-                                teacherName,
+                                teacherId,
                                 date: dateString,
-                                checkIn: null,
-                                checkOut: null,
+                                checkIns: [],
+                                checkOuts: [],
+                                notes: new Set(),
                             });
                         }
                     });
@@ -369,23 +467,49 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], al
         }
     }
 
-    const report: TeacherAttendanceReportEntry[] = Array.from(dailyRecords.values()).map(record => ({
-        teacherName: record.teacherName,
-        date: record.date,
-        checkInTime: record.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkIn) : null,
-        checkOutTime: record.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkOut) : null,
-    }));
+    return Array.from(dailyRecords.values()).map(record => {
+        record.checkIns.sort((a, b) => a.getTime() - b.getTime());
+        record.checkOuts.sort((a, b) => a.getTime() - b.getTime());
 
-    return report.sort((a, b) => {
+        const timeFormatOptions: Intl.DateTimeFormatOptions = {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+            timeZone: 'Asia/Riyadh'
+        };
+        const formatTime = (date: Date | undefined) => date ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(date) : null;
+        
+        const firstCheckIn = record.checkIns[0];
+        const lastCheckOut = record.checkOuts[record.checkOuts.length - 1];
+        const teacherName = teacherIdToNameMap.get(record.teacherId) || `المعلم #${record.teacherId}`;
+        
+        return {
+            id: `${record.teacherId}/${record.date}`,
+            teacherName,
+            date: record.date,
+            checkInTime: formatTime(firstCheckIn),
+            checkOutTime: formatTime(lastCheckOut),
+            notes: Array.from(record.notes).join('، '),
+        };
+    }).sort((a, b) => {
         if (a.date > b.date) return -1;
         if (a.date < b.date) return 1;
         return a.teacherName.localeCompare(b.teacherName, 'ar');
     });
 };
 
-const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData[], allSupervisors: string[]): SupervisorAttendanceReportEntry[] => {
+const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData[], allSupervisors: SupervisorData[]): SupervisorAttendanceReportEntry[] => {
     const timeZone = 'Asia/Riyadh';
-    
+
+    const supervisorIdToNameMap = new Map<string, string>();
+    allSupervisors.forEach(s => supervisorIdToNameMap.set(s.id, s.supervisorName));
+
+    const allSupervisorIdsForReport = new Set(allSupervisors.map(s => s.id));
+    data.forEach(item => {
+        if (item.id) allSupervisorIdsForReport.add(item.id);
+    });
+
     const toRiyadhDateString = (date: Date): string => {
         const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(date);
         const year = parts.find(p => p.type === 'year')?.value;
@@ -394,51 +518,45 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
         return `${year}-${month}-${day}`;
     };
 
-    const timeFormatOptions: Intl.DateTimeFormatOptions = {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        timeZone,
-    };
-    
-    const dailyRecords = new Map<string, { supervisorName: string; date: string; checkIn: Date | null; checkOut: Date | null }>();
+    const dailyRecords = new Map<string, { supervisorId: string; date: string; checkIn: { time: string, timestamp: Date } | null; checkOut: { time: string, timestamp: Date } | null }>();
 
     data.forEach(item => {
-        const timestamp = new Date(item.time);
-        if (isNaN(timestamp.getTime())) return;
+        const supervisorId = item.id;
+        if (!supervisorId) return; // Skip records without an ID
+
+        const timestamp = getTimestampFromItem(item);
+        if (!timestamp) return;
         
-        const supervisorName = (item.name || '').trim();
-        const status = (item.status || '').trim();
-        if (!supervisorName) return;
+        const timeForDisplay = timestamp.toLocaleTimeString('ar-EG-u-nu-latn', { timeZone, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         const dateString = toRiyadhDateString(timestamp);
-        const mapKey = `${dateString}/${supervisorName}`;
+        const mapKey = `${supervisorId}/${dateString}`;
 
         let entry = dailyRecords.get(mapKey);
         if (!entry) {
-            entry = { supervisorName, date: dateString, checkIn: null, checkOut: null };
+            entry = { supervisorId, date: dateString, checkIn: null, checkOut: null };
             dailyRecords.set(mapKey, entry);
         }
         
+        const status = (item.status || '').trim();
         if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
-            if (!entry.checkIn || timestamp < entry.checkIn) {
-                entry.checkIn = timestamp;
+            if (!entry.checkIn || timestamp < entry.checkIn.timestamp) {
+                entry.checkIn = { time: timeForDisplay, timestamp };
             }
         } else if (status === 'انصراف') {
-            if (!entry.checkOut || timestamp > entry.checkOut) {
-                entry.checkOut = timestamp;
+            if (!entry.checkOut || timestamp > entry.checkOut.timestamp) {
+                entry.checkOut = { time: timeForDisplay, timestamp };
             }
         }
     });
 
-    if (data.length > 0 || allSupervisors.length > 0) {
+    if (data.length > 0 || allSupervisorIdsForReport.size > 0) {
         let minDate: Date | null = null;
         let maxDate: Date | null = null;
 
         data.forEach(item => {
-            const timestamp = new Date(item.time);
-            if (isNaN(timestamp.getTime())) return;
+            const timestamp = getTimestampFromItem(item);
+            if (!timestamp || isNaN(timestamp.getTime())) return;
             if (!minDate || timestamp < minDate) minDate = timestamp;
             if (!maxDate || timestamp > maxDate) maxDate = timestamp;
         });
@@ -447,6 +565,7 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
         if (!maxDate || today > maxDate) {
             maxDate = today;
         }
+        
         if (minDate && maxDate) {
             const workingDays = [0, 1, 2, 3]; // Sunday to Wednesday
             let currentDate = new Date(minDate);
@@ -455,15 +574,10 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
             while (currentDate <= maxDate) {
                 if (workingDays.includes(currentDate.getDay())) {
                     const dateString = toRiyadhDateString(currentDate);
-                    allSupervisors.forEach(supervisorName => {
-                        const mapKey = `${dateString}/${supervisorName}`;
+                    allSupervisorIdsForReport.forEach(supervisorId => {
+                        const mapKey = `${dateString}/${supervisorId}`;
                         if (!dailyRecords.has(mapKey)) {
-                            dailyRecords.set(mapKey, {
-                                supervisorName,
-                                date: dateString,
-                                checkIn: null,
-                                checkOut: null,
-                            });
+                            dailyRecords.set(mapKey, { supervisorId, date: dateString, checkIn: null, checkOut: null });
                         }
                     });
                 }
@@ -473,10 +587,10 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
     }
 
     const report: SupervisorAttendanceReportEntry[] = Array.from(dailyRecords.values()).map(record => ({
-        supervisorName: record.supervisorName,
+        supervisorName: supervisorIdToNameMap.get(record.supervisorId) || `مشرف #${record.supervisorId}`,
         date: record.date,
-        checkInTime: record.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkIn) : null,
-        checkOutTime: record.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(record.checkOut) : null,
+        checkInTime: record.checkIn ? record.checkIn.time : null,
+        checkOutTime: record.checkOut ? record.checkOut.time : null,
     }));
 
     return report.sort((a, b) => {
@@ -711,6 +825,8 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
         default_student_count_day: firstRow["اليوم الافتراضي"] || '',
         teacher_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المعلمين"]),
         teacher_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمعلمين"]),
+        supervisor_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المشرفين"]),
+        supervisor_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمشرفين"]),
     };
 };
 
@@ -729,7 +845,7 @@ const App: React.FC = () => {
     const [productors, setProductors] = useState<ProductorData[]>([]);
     const [teachersInfo, setTeachersInfo] = useState<TeacherInfo[]>([]);
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherDailyAttendance[]>([]);
-    const [teacherAttendanceReport, setTeacherAttendanceReport] = useState<TeacherAttendanceReportEntry[]>([]);
+    const [combinedTeacherAttendanceLog, setCombinedTeacherAttendanceLog] = useState<CombinedTeacherAttendanceEntry[]>([]);
     const [supervisorAttendance, setSupervisorAttendance] = useState<SupervisorDailyAttendance[]>([]);
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [settings, setSettings] = useState<ProcessedSettingsData>({});
@@ -822,13 +938,12 @@ const App: React.FC = () => {
                     const processedSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
                     setSupervisors(processedSupervisors);
                     
-                    const allSupervisorNames = processedSupervisors.map(s => s.supervisorName);
                     const supervisorAttendanceRaw = dataContainer.respon || [];
                     if (Array.isArray(supervisorAttendanceRaw)) {
-                        const processedDailyAttendance = processSupervisorAttendanceData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], allSupervisorNames);
+                        const processedDailyAttendance = processSupervisorAttendanceData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], processedSupervisors);
                         setSupervisorAttendance(processedDailyAttendance);
                         
-                        const processedReport = processSupervisorAttendanceReportData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], allSupervisorNames);
+                        const processedReport = processSupervisorAttendanceReportData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], processedSupervisors);
                         setSupervisorAttendanceReport(processedReport);
                     }
                 }
@@ -845,16 +960,15 @@ const App: React.FC = () => {
                     currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
                 }
                 setTeachersInfo(currentAsrTeachers);
-                const currentAsrTeacherNames = currentAsrTeachers.map(t => t.name);
                 
                 const attendanceRaw = dataContainer.attandance || [];
                 if (attendanceRaw && Array.isArray(attendanceRaw)) {
                     const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
-                    const processedAttendance = processTeacherAttendanceData(rawAttendanceData, currentAsrTeacherNames);
+                    const processedAttendance = processTeacherAttendanceData(rawAttendanceData, currentAsrTeachers);
                     setTeacherAttendance(processedAttendance);
 
-                    const processedReport = processTeacherAttendanceReportData(rawAttendanceData, currentAsrTeacherNames);
-                    setTeacherAttendanceReport(processedReport);
+                    const processedReportLog = processTeacherAttendanceReportData(rawAttendanceData, currentAsrTeachers);
+                    setCombinedTeacherAttendanceLog(processedReportLog);
                 }
 
                 const settingsSheetData = dataContainer.setting;
@@ -968,7 +1082,7 @@ const App: React.FC = () => {
         }
     };
     
-    const handlePostTeacherAttendance = async (teacherName: string, action: 'حضور' | 'انصراف') => {
+    const handlePostTeacherAttendance = async (teacherId: number, teacherName: string, action: 'حضور' | 'انصراف') => {
         setSubmittingTeacher(teacherName);
         setIsSubmitting(true);
         setNotification(null);
@@ -1033,6 +1147,7 @@ const App: React.FC = () => {
         
         const payload: { [key: string]: any } = {
             sheet: 'attandance',
+            "teacher_id": teacherId,
             "name": teacherName,
             "status": action,
             "time": now.toISOString(),
@@ -1064,7 +1179,15 @@ const App: React.FC = () => {
         }
     };
 
-    const handlePostSupervisorAttendance = async (supervisorName: string, action: 'حضور' | 'انصراف') => {
+    const handlePostSupervisorAttendance = async (supervisorId: string, action: 'حضور' | 'انصراف') => {
+        const supervisor = supervisors.find(s => s.id === supervisorId);
+        if (!supervisor) {
+            setIsSubmitting(false);
+            setNotification({ message: 'لم يتم العثور على المشرف.', type: 'error' });
+            return;
+        }
+        const supervisorName = supervisor.supervisorName;
+
         setSubmittingSupervisor(supervisorName);
         setIsSubmitting(true);
         setNotification(null);
@@ -1094,6 +1217,7 @@ const App: React.FC = () => {
 
         const payload = {
             sheet: 'respon',
+            "id": supervisorId,
             "name": supervisorName,
             "status": action,
             "time": now.toISOString(),
@@ -1136,6 +1260,8 @@ const App: React.FC = () => {
                 "اليوم الافتراضي": data.default_student_count_day,
                 "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time || '',
                 "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time || '',
+                "وقت تأخر حضور المشرفين": data.supervisor_late_checkin_time || '',
+                "وقت انصراف مبكر للمشرفين": data.supervisor_early_checkout_time || '',
             };
             await fetch(updateUrl, {
                 method: 'POST',
@@ -1264,9 +1390,9 @@ const App: React.FC = () => {
             case 'teacherAttendance':
                 return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} />;
             case 'teacherAttendanceReport':
-                return <TeacherAttendanceReportPage reportData={teacherAttendanceReport} allTeachers={asrTeachersInfo} />;
+                return <TeacherAttendanceReportPage reportData={combinedTeacherAttendanceLog} />;
             case 'supervisorAttendance':
-                return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} />;
+                return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} />;
             case 'supervisorAttendanceReport':
                 return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
             case 'dailyStudents':

@@ -1,3 +1,5 @@
+
+
 export interface RawStudentData {
   "الطالب": string;
   "اسم المستخدم": number;
@@ -170,30 +172,37 @@ export interface ProcessedExamData {
 }
 
 export interface RawSupervisorData {
+  "id": string;
   "الحلقة": string;
   "المشرف": string;
   "كلمة المرور": string;
 }
 
 export interface SupervisorData {
+  id: string;
   supervisorName: string;
   password: string;
   circles: string[];
 }
 
 export interface RawTeacherAttendanceData {
-  "time": string;
+  "teacher_id"?: number;
+  "time"?: string;
+  "تاريخ العملية": string;
+  "وقت العملية": string;
   "name": string;
   "status": 'حضور' | 'انصراف';
   "ملاحظات"?: string;
 }
 
 export interface TeacherInfo {
+  id: number;
   name: string;
   circle: string;
 }
 
 export interface RawTeacherInfo {
+  "teacher_id": number;
   "المعلم": string;
   "الحلقات": string;
   "وقت الحلقة": string;
@@ -222,7 +231,10 @@ export interface TeacherAttendanceSummaryEntry {
 }
 
 export interface RawSupervisorAttendanceData {
-  "time": string;
+  "id"?: string;
+  "time"?: string;
+  "تاريخ العملية": string;
+  "وقت العملية": string;
   "name": string;
   "status": 'حضور' | 'انصراف' | 'الحضور';
 }
@@ -242,6 +254,7 @@ export interface SupervisorAttendanceSummaryEntry {
 }
 
 export interface SupervisorInfo {
+  id: string;
   name: string;
 }
 
@@ -267,6 +280,8 @@ export interface RawSettingData {
   "اليوم الافتراضي": string;
   "وقت تأخر حضور المعلمين": string;
   "وقت انصراف مبكر للمعلمين": string;
+  "وقت تأخر حضور المشرفين"?: string;
+  "وقت انصراف مبكر للمشرفين"?: string;
 }
 
 export type ProcessedSettingsData = Record<string, string>;
@@ -281,4 +296,13 @@ export interface ProductorData {
   role: string;
   name: string;
   password: string;
+}
+
+export interface CombinedTeacherAttendanceEntry {
+  id: string;
+  teacherName: string;
+  date: string;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  notes: string;
 }

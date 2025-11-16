@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { TeacherDailyAttendance, TeacherInfo } from '../types';
 import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
@@ -5,7 +6,7 @@ import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
 interface TeacherAttendancePageProps {
   allTeachers: TeacherInfo[];
   attendanceStatus: TeacherDailyAttendance[];
-  onSubmit: (teacherName: string, action: 'حضور' | 'انصراف') => Promise<void>;
+  onSubmit: (teacherId: number, teacherName: string, action: 'حضور' | 'انصراف') => Promise<void>;
   isSubmitting: boolean;
   submittingTeacher: string | null;
 }
@@ -110,6 +111,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
                 {filteredTeachers.map(teacher => {
                     const teacherName = teacher.name;
+                    const teacherId = teacher.id;
                     const statusInfo = statusMap.get(teacherName);
                     const isThisTeacherSubmitting = submittingTeacher === teacherName;
                     const notes = statusInfo?.notes;
@@ -179,7 +181,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                                         {checkInTime}
                                     </div>
                                     <button 
-                                        onClick={() => onSubmit(teacherName, 'حضور')}
+                                        onClick={() => onSubmit(teacherId, teacherName, 'حضور')}
                                         disabled={!canCheckIn || isSubmitting}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >
@@ -191,7 +193,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                                         {checkOutTime}
                                     </div>
                                     <button 
-                                        onClick={() => onSubmit(teacherName, 'انصراف')}
+                                        onClick={() => onSubmit(teacherId, teacherName, 'انصراف')}
                                         disabled={!canCheckOut || isSubmitting}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >

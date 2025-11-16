@@ -21,6 +21,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
     default_student_count_day: '',
     teacher_late_checkin_time: '',
     teacher_early_checkout_time: '',
+    supervisor_late_checkin_time: '',
+    supervisor_early_checkout_time: '',
   });
 
   useEffect(() => {
@@ -28,6 +30,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
       default_student_count_day: settings.default_student_count_day || '',
       teacher_late_checkin_time: settings.teacher_late_checkin_time || '15:25',
       teacher_early_checkout_time: settings.teacher_early_checkout_time || '16:50',
+      supervisor_late_checkin_time: settings.supervisor_late_checkin_time || '15:20',
+      supervisor_early_checkout_time: settings.supervisor_early_checkout_time || '17:00',
     });
   }, [settings]);
 
@@ -54,7 +58,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-stone-200">
             <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-stone-800">الإعدادات الافتراضية</h2>
-                <p className="text-stone-500 mt-2">إدارة الإعدادات العامة لبطاقات التقارير وحضور المعلمين.</p>
+                <p className="text-stone-500 mt-2">إدارة الإعدادات العامة لبطاقات التقارير وحضور المعلمين والمشرفين.</p>
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -91,6 +95,29 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, isSubmitt
                             id="early_time_input" 
                             value={localSettings.teacher_early_checkout_time} 
                             onChange={(e) => handleChange('teacher_early_checkout_time', e.target.value)} 
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label htmlFor="supervisor_late_time_input" className="block text-sm font-medium text-stone-700 mb-2">وقت بدء احتساب تأخر المشرفين</label>
+                        <input 
+                            type="time" 
+                            id="supervisor_late_time_input" 
+                            value={localSettings.supervisor_late_checkin_time} 
+                            onChange={(e) => handleChange('supervisor_late_checkin_time', e.target.value)} 
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="supervisor_early_time_input" className="block text-sm font-medium text-stone-700 mb-2">وقت بدء احتساب انصراف مبكر للمشرفين</label>
+                        <input 
+                            type="time" 
+                            id="supervisor_early_time_input" 
+                            value={localSettings.supervisor_early_checkout_time} 
+                            onChange={(e) => handleChange('supervisor_early_checkout_time', e.target.value)} 
                             className="block w-full pl-3 pr-10 py-2 text-base border-stone-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
                         />
                     </div>

@@ -6,7 +6,7 @@ import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
 interface SupervisorAttendancePageProps {
   allSupervisors: SupervisorInfo[];
   attendanceStatus: SupervisorDailyAttendance[];
-  onSubmit: (supervisorName: string, action: 'حضور' | 'انصراف') => Promise<void>;
+  onSubmit: (supervisorId: string, action: 'حضور' | 'انصراف') => Promise<void>;
   isSubmitting: boolean;
   submittingSupervisor: string | null;
 }
@@ -78,6 +78,7 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
                 {allSupervisors.map(supervisor => {
                     const supervisorName = supervisor.name;
+                    const supervisorId = supervisor.id;
                     const statusInfo = statusMap.get(supervisorName);
                     const isThisSupervisorSubmitting = submittingSupervisor === supervisorName;
 
@@ -134,7 +135,7 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
                                         {checkInTime}
                                     </div>
                                     <button 
-                                        onClick={() => onSubmit(supervisorName, 'حضور')}
+                                        onClick={() => onSubmit(supervisorId, 'حضور')}
                                         disabled={!canCheckIn || isSubmitting}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >
@@ -146,7 +147,7 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
                                         {checkOutTime}
                                     </div>
                                     <button 
-                                        onClick={() => onSubmit(supervisorName, 'انصراف')}
+                                        onClick={() => onSubmit(supervisorId, 'انصراف')}
                                         disabled={!canCheckOut || isSubmitting}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >

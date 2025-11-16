@@ -13,39 +13,17 @@ interface SupervisorAttendanceReportPageProps {
 
 const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPageProps> = ({ reportData }) => {
   const [activeTab, setActiveTab] = React.useState<'detailed' | 'summary'>('detailed');
-  const [startDate, setStartDate] = React.useState('');
-  const [endDate, setEndDate] = React.useState('');
-  const [selectedSupervisor, setSelectedSupervisor] = React.useState('');
   const [modalData, setModalData] = React.useState<{ title: string; dates: string[] } | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [startDate, endDate, selectedSupervisor, activeTab]);
-
-  const supervisors = React.useMemo(() => {
-    const supervisorSet = new Set<string>(reportData.map(r => r.supervisorName));
-    return Array.from<string>(supervisorSet).sort((a, b) => a.localeCompare(b, 'ar'));
-  }, [reportData]);
-
-  const filteredData = React.useMemo(() => {
-    return reportData.filter(item => {
-      const itemDate = new Date(item.date + 'T00:00:00Z');
-      const start = startDate ? new Date(startDate + 'T00:00:00Z') : null;
-      const end = endDate ? new Date(endDate + 'T00:00:00Z') : null;
-
-      if (start && itemDate < start) return false;
-      if (end && itemDate > end) return false;
-      if (selectedSupervisor && item.supervisorName !== selectedSupervisor) return false;
-      
-      return true;
-    });
-  }, [reportData, startDate, endDate, selectedSupervisor]);
+  }, [activeTab]);
 
   const summaryData: SupervisorAttendanceSummaryEntry[] = React.useMemo(() => {
     const summaryMap = new Map<string, { presentDates: Set<string>; absentDates: Set<string> }>();
 
-    filteredData.forEach(item => {
+    reportData.forEach(item => {
         if (!summaryMap.has(item.supervisorName)) {
             summaryMap.set(item.supervisorName, { presentDates: new Set(), absentDates: new Set() });
         }
@@ -72,15 +50,15 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
             };
         })
         .sort((a, b) => a.supervisorName.localeCompare(b.supervisorName, 'ar'));
-  }, [filteredData]);
+  }, [reportData]);
   
   const paginatedDetailedData = React.useMemo(() => {
-    return filteredData.slice(
+    return reportData.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
       currentPage * ITEMS_PER_PAGE
     );
-  }, [filteredData, currentPage]);
-  const totalDetailedPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  }, [reportData, currentPage]);
+  const totalDetailedPages = Math.ceil(reportData.length / ITEMS_PER_PAGE);
 
   const paginatedSummaryData = React.useMemo(() => {
     return summaryData.slice(
@@ -90,12 +68,6 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
   }, [summaryData, currentPage]);
   const totalSummaryPages = Math.ceil(summaryData.length / ITEMS_PER_PAGE);
 
-
-  const handleClearFilters = () => {
-    setStartDate('');
-    setEndDate('');
-    setSelectedSupervisor('');
-  };
   
   const handleShowDates = (supervisorName: string, type: 'present' | 'absent') => {
     const title = type === 'present' 
@@ -103,7 +75,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
         : `أيام الغياب للمشرف: ${supervisorName}`;
     
     const dateSet = new Set<string>();
-    filteredData
+    reportData
         .filter(item => item.supervisorName === supervisorName)
         .forEach(item => {
             const isAbsent = item.checkInTime === null && item.checkOutTime === null;
@@ -120,14 +92,13 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
   };
 
   const handleExport = () => {
-    // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
     const XLSX = (window as any).XLSX;
     let dataToExport;
     let fileName;
     let sheetName;
 
     if (activeTab === 'detailed') {
-      dataToExport = filteredData.map(item => ({
+      dataToExport = reportData.map(item => ({
         'اسم المشرف': item.supervisorName,
         'التاريخ': new Date(item.date + 'T00:00:00Z').toLocaleDateString('ar-EG', { timeZone: 'UTC' }),
         'وقت الحضور': item.checkInTime || 'غائب',
@@ -152,7 +123,6 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
     XLSX.writeFile(wb, fileName);
   };
 
-
   const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => (
     <button
       onClick={onClick}
@@ -171,67 +141,21 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-xl border border-stone-200 print-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
-          <div className="md:col-span-1">
-            <label htmlFor="start-date" className="block text-sm font-medium text-stone-700 mb-2">من تاريخ</label>
-            <input
-              type="date"
-              id="start-date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-            />
-          </div>
-          <div className="md:col-span-1">
-            <label htmlFor="end-date" className="block text-sm font-medium text-stone-700 mb-2">إلى تاريخ</label>
-            <input
-              type="date"
-              id="end-date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              className="block w-full pl-3 pr-2 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-            />
-          </div>
-          <div className="md:col-span-1">
-            <label htmlFor="supervisor-filter" className="block text-sm font-medium text-stone-700 mb-2">المشرف</label>
-            <select
-              id="supervisor-filter"
-              value={selectedSupervisor}
-              onChange={e => setSelectedSupervisor(e.target.value)}
-              className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-            >
-              <option value="">كل المشرفين</option>
-              {supervisors.map(supervisor => (
-                <option key={supervisor} value={supervisor}>{supervisor}</option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-1">
-            <button
-              onClick={handleClearFilters}
-              className="w-full h-10 px-4 text-sm font-semibold text-stone-700 bg-stone-200 rounded-md shadow-sm hover:bg-stone-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-400 transition-all duration-150"
-            >
-              مسح الفلتر
-            </button>
-          </div>
-          <div className="md:col-span-2 grid grid-cols-2 gap-2">
+      <div className="flex justify-end print-hidden gap-2">
             <button
                 onClick={handleExport}
-                className="w-full h-10 px-4 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2"
+                className="w-auto h-10 px-4 text-sm font-semibold text-green-800 bg-green-100 rounded-md shadow-sm hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 flex items-center justify-center gap-2"
             >
                 <ExcelIcon />
                 تصدير لإكسل
             </button>
             <button
               onClick={() => window.print()}
-              className="w-full h-10 px-4 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"
+              className="w-auto h-10 px-4 text-sm font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 flex items-center justify-center gap-2"
             >
               <PrintIcon />
               طباعة
             </button>
-          </div>
-        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden printable-area">
@@ -279,7 +203,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
                   ) : (
                     <tr>
                       <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
-                        لا توجد بيانات تطابق الفلتر المحدد.
+                        لا توجد بيانات لعرضها.
                       </td>
                     </tr>
                   )}
@@ -338,7 +262,7 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
                   ) : (
                     <tr>
                       <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
-                        لا توجد بيانات تطابق الفلتر المحدد.
+                        لا توجد بيانات لعرضها.
                       </td>
                     </tr>
                   )}
