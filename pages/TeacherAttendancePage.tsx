@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import type { TeacherDailyAttendance, TeacherInfo } from '../types';
+import type { TeacherDailyAttendance, TeacherInfo, AuthenticatedUser } from '../types';
 import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
 
 interface TeacherAttendancePageProps {
@@ -9,9 +8,10 @@ interface TeacherAttendancePageProps {
   onSubmit: (teacherId: number, teacherName: string, action: 'حضور' | 'انصراف') => Promise<void>;
   isSubmitting: boolean;
   submittingTeacher: string | null;
+  authenticatedUser: AuthenticatedUser | null;
 }
 
-const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher }) => {
+const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeachers, attendanceStatus, onSubmit, isSubmitting, submittingTeacher, authenticatedUser }) => {
     
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -56,14 +56,21 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
         day: 'numeric'
     }).format(today);
     
-    const filteredTeachers = React.useMemo(() => {
-        if (!searchQuery) {
-            return allTeachers;
+    const isSingleTeacherView = authenticatedUser?.role === 'teacher';
+
+    const teachersToDisplay = React.useMemo(() => {
+        if (isSingleTeacherView && authenticatedUser.teacherId) {
+            return allTeachers.filter(teacher => teacher.id === authenticatedUser.teacherId);
         }
-        return allTeachers.filter(teacher =>
-            teacher.name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [allTeachers, searchQuery]);
+        
+        let list = allTeachers;
+        if (searchQuery && !isSingleTeacherView) {
+            list = list.filter(teacher =>
+                teacher.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+        return list;
+    }, [allTeachers, authenticatedUser, isSingleTeacherView, searchQuery]);
 
 
     if (allTeachers.length === 0) {
@@ -89,27 +96,30 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                 </div>
             </div>
 
-            <div className="mb-6">
-                <label htmlFor="teacher-search" className="block text-sm font-medium text-stone-700 mb-2">بحث سريع بالمعلم</label>
-                <div className="relative">
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                        </svg>
+            {!isSingleTeacherView && (
+                <div className="mb-6">
+                    <label htmlFor="teacher-search" className="block text-sm font-medium text-stone-700 mb-2">بحث سريع بالمعلم</label>
+                    <div className="relative">
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            id="teacher-search"
+                            className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
+                            placeholder="ادخل اسم المعلم..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
-                    <input
-                        type="text"
-                        id="teacher-search"
-                        className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md"
-                        placeholder="ادخل اسم المعلم..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
                 </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-                {filteredTeachers.map(teacher => {
+
+            <div className={isSingleTeacherView ? 'max-w-md mx-auto' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6'}>
+                {teachersToDisplay.map(teacher => {
                     const teacherName = teacher.name;
                     const teacherId = teacher.id;
                     const statusInfo = statusMap.get(teacherName);
@@ -156,6 +166,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                     const checkInTime = statusInfo?.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkIn) : '';
                     const checkOutTime = statusInfo?.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkOut) : '';
                     
+                    const canPerformAction = true;
                     const canCheckIn = !statusInfo?.checkIn;
                     const canCheckOut = !!statusInfo?.checkIn && !statusInfo?.checkOut;
 
@@ -182,7 +193,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                                     </div>
                                     <button 
                                         onClick={() => onSubmit(teacherId, teacherName, 'حضور')}
-                                        disabled={!canCheckIn || isSubmitting}
+                                        disabled={!canCheckIn || isSubmitting || !canPerformAction}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >
                                         تسجيل حضور
@@ -194,7 +205,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                                     </div>
                                     <button 
                                         onClick={() => onSubmit(teacherId, teacherName, 'انصراف')}
-                                        disabled={!canCheckOut || isSubmitting}
+                                        disabled={!canCheckOut || isSubmitting || !canPerformAction}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >
                                         تسجيل انصراف
@@ -204,7 +215,7 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ allTeache
                         </div>
                     );
                 })}
-                {filteredTeachers.length === 0 && allTeachers.length > 0 && (
+                {teachersToDisplay.length === 0 && allTeachers.length > 0 && (
                     <div className="col-span-full text-center py-10">
                         <p className="text-lg text-gray-600">لا يوجد معلمون يطابقون بحثك.</p>
                     </div>

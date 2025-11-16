@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -25,7 +23,7 @@ import TeacherListPage from './pages/TeacherListPage';
 import PasswordModal from './components/PasswordModal';
 import { Sidebar } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData, CombinedTeacherAttendanceEntry } from './types';
+import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData, CombinedTeacherAttendanceEntry, AuthenticatedUser } from './types';
 import { MenuIcon } from './components/icons';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzUUEJKndeH57my0QQd7UstCbsU6BftKOqR6vb83QkHN9tkGT3MTKuc16Zs8U43P8b1/exec';
@@ -179,11 +177,14 @@ const processProductorData = (data: RawProductorData[]): ProductorData[] => {
 
 const getTimestampFromItem = (item: RawTeacherAttendanceData | RawSupervisorAttendanceData): Date | null => {
     let timestamp: Date | null = null;
-    const dateProcessStr = item['تاريخ العملية'];
-    const timeProcessStr = item['وقت العملية'];
+    const dateProcessValue = item['تاريخ العملية'];
+    const timeProcessValue = item['وقت العملية'];
 
-    if (dateProcessStr && timeProcessStr) {
+    if (dateProcessValue && timeProcessValue) {
         try {
+            const dateProcessStr = String(dateProcessValue);
+            const timeProcessStr = String(timeProcessValue);
+
             const dateMatch = dateProcessStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
             if (!dateMatch) throw new Error("Invalid date format");
             
@@ -831,7 +832,6 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
 };
 
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
-type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
@@ -1289,7 +1289,7 @@ const App: React.FC = () => {
 
         // Unauthenticated access check
         if (!authenticatedUser) {
-            if (page === 'evaluation' || page === 'exam' || page === 'settings') {
+            if (['evaluation', 'exam', 'settings'].includes(page)) {
                 setCurrentPage(page);
                 setShowPasswordModal(true);
                 setIsMobileSidebarOpen(false);
@@ -1346,9 +1346,9 @@ const App: React.FC = () => {
         notes: 'ملاحظات الطلاب',
         evaluation: `زيارات الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
         excellence: 'تميز الحلقات',
-        teacherAttendance: 'حضور وانصراف المعلمين',
+        teacherAttendance: `حضور وانصراف المعلمين`,
         teacherAttendanceReport: 'تقرير حضور المعلمين',
-        supervisorAttendance: 'حضور المشرفين',
+        supervisorAttendance: `حضور المشرفين`,
         supervisorAttendanceReport: 'تقرير حضور المشرفين',
         dailyStudents: 'التقرير اليومي (طلاب)',
         dailyCircles: 'التقرير اليومي (حلقات)',
@@ -1388,11 +1388,11 @@ const App: React.FC = () => {
             case 'excellence':
                 return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'teacherAttendance':
-                return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} />;
+                return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} authenticatedUser={authenticatedUser} />;
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage reportData={combinedTeacherAttendanceLog} />;
             case 'supervisorAttendance':
-                return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} />;
+                return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} authenticatedUser={authenticatedUser} />;
             case 'supervisorAttendanceReport':
                 return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
             case 'dailyStudents':
@@ -1462,6 +1462,14 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
+                        // Re-check authorization for the page they intended to visit
+                        if (currentPage === 'settings' && user.role !== 'admin') {
+                            setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
+                            setCurrentPage('general');
+                        } else if (currentPage === 'exam' && !['admin', 'exam_teacher'].includes(user.role)) {
+                            setNotification({ message: 'هذه الصفحة مخصصة لمعلمي الاختبارات والإدارة فقط.', type: 'error' });
+                            setCurrentPage('general');
+                        }
                     }}
                     onClose={() => {
                         setShowPasswordModal(false);
@@ -1472,6 +1480,7 @@ const App: React.FC = () => {
                     }}
                     supervisors={supervisors}
                     productors={productors}
+                    teachersInfo={teachersInfo}
                 />
             )}
             <Notification notification={notification} onClose={() => setNotification(null)} />

@@ -306,3 +306,11 @@ export interface CombinedTeacherAttendanceEntry {
   checkOutTime: string | null;
   notes: string;
 }
+
+export type AuthenticatedUser = {
+    role: 'admin' | 'supervisor' | 'exam_teacher' | 'teacher';
+    name: string;
+    circles: string[];
+    teacherId?: number;
+    supervisorId?: string;
+};

@@ -1,7 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { ProcessedRegisteredStudentData, ExamSubmissionData } from '../types';
-
-type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
+import type { ProcessedRegisteredStudentData, ExamSubmissionData, AuthenticatedUser } from '../types';
 
 interface ExamPageProps {
   onSubmit: (data: ExamSubmissionData) => Promise<void>;

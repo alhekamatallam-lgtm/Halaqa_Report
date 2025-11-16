@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import type { SupervisorDailyAttendance, SupervisorInfo } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import type { SupervisorDailyAttendance, SupervisorInfo, AuthenticatedUser } from '../types';
 import { EnterFullscreenIcon, ExitFullscreenIcon } from '../components/icons';
 
 interface SupervisorAttendancePageProps {
@@ -9,9 +8,10 @@ interface SupervisorAttendancePageProps {
   onSubmit: (supervisorId: string, action: 'حضور' | 'انصراف') => Promise<void>;
   isSubmitting: boolean;
   submittingSupervisor: string | null;
+  authenticatedUser: AuthenticatedUser | null;
 }
 
-const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ allSupervisors, attendanceStatus, onSubmit, isSubmitting, submittingSupervisor }) => {
+const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ allSupervisors, attendanceStatus, onSubmit, isSubmitting, submittingSupervisor, authenticatedUser }) => {
     
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -53,6 +53,16 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
         day: 'numeric'
     }).format(today);
 
+    const isSingleSupervisorView = authenticatedUser?.role === 'supervisor';
+
+    const supervisorsToDisplay = useMemo(() => {
+        if (isSingleSupervisorView && authenticatedUser.supervisorId) {
+            return allSupervisors.filter(s => s.id === authenticatedUser.supervisorId);
+        }
+        return allSupervisors;
+    }, [allSupervisors, authenticatedUser, isSingleSupervisorView]);
+
+
     if (allSupervisors.length === 0) {
         return (
             <div className="text-center py-10 bg-white rounded-lg shadow-md">
@@ -75,8 +85,8 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
                     </button>
                 </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-                {allSupervisors.map(supervisor => {
+            <div className={isSingleSupervisorView ? 'max-w-md mx-auto' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6'}>
+                {supervisorsToDisplay.map(supervisor => {
                     const supervisorName = supervisor.name;
                     const supervisorId = supervisor.id;
                     const statusInfo = statusMap.get(supervisorName);
@@ -118,6 +128,7 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
                     const checkInTime = statusInfo?.checkIn ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkIn) : '';
                     const checkOutTime = statusInfo?.checkOut ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(statusInfo.checkOut) : '';
                     
+                    const canPerformAction = true;
                     const canCheckIn = !statusInfo?.checkIn;
                     const canCheckOut = !!statusInfo?.checkIn && !statusInfo?.checkOut;
 
@@ -136,7 +147,7 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
                                     </div>
                                     <button 
                                         onClick={() => onSubmit(supervisorId, 'حضور')}
-                                        disabled={!canCheckIn || isSubmitting}
+                                        disabled={!canCheckIn || isSubmitting || !canPerformAction}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >
                                         تسجيل حضور
@@ -148,7 +159,7 @@ const SupervisorAttendancePage: React.FC<SupervisorAttendancePageProps> = ({ all
                                     </div>
                                     <button 
                                         onClick={() => onSubmit(supervisorId, 'انصراف')}
-                                        disabled={!canCheckOut || isSubmitting}
+                                        disabled={!canCheckOut || isSubmitting || !canPerformAction}
                                         className="w-full h-10 px-4 text-sm font-semibold text-white bg-red-600 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-150 disabled:bg-stone-300 disabled:cursor-not-allowed"
                                     >
                                         تسجيل انصراف

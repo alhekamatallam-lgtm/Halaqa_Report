@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
-import type { SupervisorData, ProductorData } from '../types';
-
-type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
+import type { SupervisorData, ProductorData, AuthenticatedUser, TeacherInfo } from '../types';
 
 interface PasswordModalProps {
   onSuccess: (user: AuthenticatedUser) => void;
   onClose: () => void;
   supervisors: SupervisorData[];
   productors: ProductorData[];
+  teachersInfo: TeacherInfo[];
 }
 
-const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, supervisors, productors }) => {
+const normalizeArabicForMatch = (text: string) => {
+    if (!text) return '';
+    return text
+        .normalize('NFC')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/[إأآا]/g, 'ا')
+        .replace(/[يى]/g, 'ي')
+        .replace(/ة/g, 'ه')
+        .trim();
+};
+
+
+const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, supervisors, productors, teachersInfo }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -27,19 +39,35 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ onSuccess, onClose, super
       onSuccess({
         role: 'supervisor',
         name: foundSupervisor.supervisorName,
-        circles: foundSupervisor.circles
+        circles: foundSupervisor.circles,
+        supervisorId: foundSupervisor.id
       });
       return;
     }
 
     const foundProductor = productors.find(p => p.password === password);
-    if (foundProductor && foundProductor.role === 'معلم اختبارات') {
-      onSuccess({
-        role: 'exam_teacher',
-        name: foundProductor.name,
-        circles: []
-      });
-      return;
+    if (foundProductor) {
+      if (foundProductor.role === 'معلم اختبارات') {
+        onSuccess({
+          role: 'exam_teacher',
+          name: foundProductor.name,
+          circles: []
+        });
+        return;
+      }
+      if (foundProductor.role === 'معلم') {
+          const normalizedProductorName = normalizeArabicForMatch(foundProductor.name);
+          const teacher = teachersInfo.find(t => t.name === normalizedProductorName);
+          if (teacher) {
+              onSuccess({
+                  role: 'teacher',
+                  name: teacher.name,
+                  circles: [teacher.circle],
+                  teacherId: teacher.id
+              });
+              return;
+          }
+      }
     }
     
     setError('كلمة المرور غير صحيحة. حاول مرة أخرى.');

@@ -1,9 +1,8 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import type { EvalSubmissionPayload, ProcessedStudentData, EvalQuestion, ProcessedEvalResult, ProcessedSettingsData } from '../types';
-import PastEvaluationsTable from '../components/PastEvaluationsTable';
 
-type AuthenticatedUser = { role: 'admin' | 'supervisor', name: string, circles: string[] };
+import React, { useState, useMemo, useEffect } from 'react';
+import type { EvalSubmissionPayload, ProcessedStudentData, EvalQuestion, ProcessedEvalResult, ProcessedSettingsData, AuthenticatedUser } from '../types';
+import PastEvaluationsTable from '../components/PastEvaluationsTable';
 
 interface EvaluationPageProps {
   onSubmit: (data: EvalSubmissionPayload) => Promise<void>;

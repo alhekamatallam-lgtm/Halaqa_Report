@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { 
     HomeIcon, 
@@ -17,8 +18,8 @@ import {
     SettingsIcon,
     IdentificationIcon,
 } from './icons';
+import type { AuthenticatedUser } from '../types';
 
-type AuthenticatedUser = { role: 'admin' | 'supervisor' | 'exam_teacher', name: string, circles: string[] };
 type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 interface SidebarProps {
