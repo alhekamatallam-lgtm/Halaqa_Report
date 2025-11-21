@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import StudentReportPage from './pages/StudentReportPage';
 import CircleReportPage from './pages/CircleReportPage';
@@ -28,6 +29,7 @@ import { MenuIcon } from './components/icons';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzUUEJKndeH57my0QQd7UstCbsU6BftKOqR6vb83QkHN9tkGT3MTKuc16Zs8U43P8b1/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
+const CACHE_KEY = 'quran_app_data_v1';
 
 const normalizeArabicForMatch = (text: string) => {
     if (!text) return '';
@@ -80,28 +82,25 @@ const processEvalResultsData = (
   const headerMap = new Map<number, string>();
   const maxScore = questions.reduce((sum, q) => sum + q.mark, 0);
 
-  // Build the header map from the first data row and the questions list for robust matching.
   if (data.length > 0) {
     const firstRow = data[0];
     const headers = Object.keys(firstRow);
     const normalize = (text: string): string =>
       String(text || '')
         .normalize('NFC')
-        .replace(/[\u200B-\u200D\uFEFF\s]/g, '') // Remove zero-width chars and all whitespace
-        .replace(/[إأآا]/g, 'ا'); // Unify Alif
+        .replace(/[\u200B-\u200D\uFEFF\s]/g, '') 
+        .replace(/[إأآا]/g, 'ا'); 
 
     questions.forEach(q => {
       const normalizedQue = normalize(q.que);
       const foundHeader = headers.find(h => normalize(h) === normalizedQue);
       if (foundHeader) {
-        headerMap.set(q.id, foundHeader.trim()); // Store the exact, trimmed header
+        headerMap.set(q.id, foundHeader.trim()); 
       } else {
-        // Fallback for safety, use the question from the 'eval' sheet
         headerMap.set(q.id, q.que.trim());
       }
     });
   } else {
-    // If there's no previous data, we assume the `eval` sheet's questions are the headers
     questions.forEach(q => {
         headerMap.set(q.id, q.que.trim());
     });
@@ -180,15 +179,38 @@ const getTimestampFromItem = (item: RawTeacherAttendanceData | RawSupervisorAtte
     const dateProcessValue = item['تاريخ العملية'];
     const timeProcessValue = item['وقت العملية'];
 
+    const isValidDate = (d: Date) => !isNaN(d.getTime());
+
+    if (!dateProcessValue || typeof dateProcessValue === 'object' || 
+        !timeProcessValue || typeof timeProcessValue === 'object') {
+        return null;
+    }
+
     if (dateProcessValue && timeProcessValue) {
         try {
             const dateProcessStr = String(dateProcessValue);
             const timeProcessStr = String(timeProcessValue);
 
+            if (dateProcessStr.includes('object') || timeProcessStr.includes('object')) {
+                return null;
+            }
+
+            let year: number, month: number, day: number;
+
             const dateMatch = dateProcessStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-            if (!dateMatch) throw new Error("Invalid date format");
-            
-            const [, year, month, day] = dateMatch.map(Number);
+            if (dateMatch) {
+                year = Number(dateMatch[1]);
+                month = Number(dateMatch[2]);
+                day = Number(dateMatch[3]);
+            } else {
+                const d = new Date(dateProcessStr);
+                if (!isValidDate(d)) return null; 
+                year = d.getFullYear();
+                month = d.getMonth() + 1;
+                day = d.getDate();
+            }
+
+            if (year < 2023) return null;
 
             let timeString = timeProcessStr.trim();
             let isPM = false;
@@ -200,45 +222,41 @@ const getTimestampFromItem = (item: RawTeacherAttendanceData | RawSupervisorAtte
                 timeString = timeString.replace(/ص/g, '').trim();
             }
 
-            // Handle dummy date like "1899-12-30 13:55:36"
-            if (timeString.includes(' ')) {
+            if (timeString.includes('T')) {
+                timeString = timeString.split('T')[1];
+            } else if (timeString.includes(' ')) {
                 timeString = timeString.split(' ').pop() || '';
             }
 
+            timeString = timeString.replace('Z', '').split('.')[0];
+
             const timeParts = timeString.split(':').map(Number);
-            if (timeParts.length < 2 || timeParts.some(isNaN)) {
-                 throw new Error("Invalid time format");
-            }
+            if (timeParts.length < 2 || timeParts.some(p => isNaN(p))) return null;
 
             let [hour, minute, second = 0] = timeParts;
 
             if (isPM && hour < 12) {
                 hour += 12;
-            } else if (!isPM && hour === 12) { // Handle 12 AM (midnight) case
+            } else if (!isPM && hour === 12) {
                 hour = 0;
             }
 
-            // Create a date object assuming the parts are in UTC
             const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-            
-            // The time is for Riyadh (UTC+3). So, the actual UTC time is 3 hours earlier.
-            // Subtract 3 hours to get the correct UTC timestamp.
-            utcDate.setUTCHours(utcDate.getUTCHours() - 3);
+            // Remove manual shift to keep raw timestamp logic cleaner
+            // utcDate.setUTCHours(utcDate.getUTCHours() - 3); 
 
-            if (!isNaN(utcDate.getTime())) {
+            if (isValidDate(utcDate)) {
                 timestamp = utcDate;
             }
 
         } catch (e) {
-            console.error("Error parsing new date/time:", item, e);
-            // Fall through to fallback
+             // fail silently
         }
     }
     
-    // Fallback to the original `time` field
     if (!timestamp && item.time) {
         const ts = new Date(item.time);
-        if (!isNaN(ts.getTime())) {
+        if (isValidDate(ts) && ts.getFullYear() >= 2023) {
             timestamp = ts;
         }
     }
@@ -274,13 +292,11 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
         if (!timestamp) return;
         
         const itemDateRiyadhStr = timestamp.toLocaleDateString('en-CA', { timeZone });
-        
         const status = (item.status || '').trim();
         const note = (item['ملاحظات'] || '').trim();
 
         if (itemDateRiyadhStr === todayRiyadhStr && teacherRecords.has(teacherId)) {
             const record = teacherRecords.get(teacherId)!;
-
             if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
                 if (!record.checkIn || timestamp < record.checkIn) {
                     record.checkIn = timestamp;
@@ -297,28 +313,17 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
 
     return Array.from(teacherRecords.values()).map(record => {
         let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
-        if (record.checkIn && record.checkOut) {
-            status = 'مكتمل الحضور';
-        } else if (record.checkIn) {
-            status = 'حاضر';
-        }
+        if (record.checkIn && record.checkOut) status = 'مكتمل الحضور';
+        else if (record.checkIn) status = 'حاضر';
         
         const combinedNotes = [record.checkInNote, record.checkOutNote].filter(Boolean).join('، ');
-        
-        return {
-            teacherName: record.teacherName,
-            checkIn: record.checkIn,
-            checkOut: record.checkOut,
-            status,
-            notes: combinedNotes || undefined,
-        };
+        return { teacherName: record.teacherName, checkIn: record.checkIn, checkOut: record.checkOut, status, notes: combinedNotes || undefined };
     });
 };
 
 const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], allSupervisors: SupervisorData[]): SupervisorDailyAttendance[] => {
     const timeZone = 'Asia/Riyadh';
     const todayRiyadhStr = new Date().toLocaleDateString('en-CA', { timeZone });
-
     const supervisorRecords = new Map<string, { supervisorName: string, checkIn: Date | null, checkOut: Date | null }>();
 
     allSupervisors.forEach(s => {
@@ -328,251 +333,208 @@ const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], al
     data.forEach(item => {
         const supervisorId = item.id;
         if (!supervisorId) return;
-
         const timestamp = getTimestampFromItem(item);
         if (!timestamp) return;
-
         const itemDateRiyadhStr = timestamp.toLocaleDateString('en-CA', { timeZone });
         const status = (item.status || '').trim();
 
         if (itemDateRiyadhStr === todayRiyadhStr && supervisorRecords.has(supervisorId)) {
             const record = supervisorRecords.get(supervisorId)!;
-
             if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
-                if (!record.checkIn || timestamp < record.checkIn) {
-                    record.checkIn = timestamp;
-                }
+                if (!record.checkIn || timestamp < record.checkIn) record.checkIn = timestamp;
             } else if (status === 'انصراف') {
-                 if (!record.checkOut || timestamp > record.checkOut) {
-                    record.checkOut = timestamp;
-                }
+                 if (!record.checkOut || timestamp > record.checkOut) record.checkOut = timestamp;
             }
         }
     });
 
     return Array.from(supervisorRecords.values()).map(record => {
         let status: 'لم يحضر' | 'حاضر' | 'مكتمل الحضور' = 'لم يحضر';
-        if (record.checkIn && record.checkOut) {
-            status = 'مكتمل الحضور';
-        } else if (record.checkIn) {
-            status = 'حاضر';
-        }
-        
-        return {
-            supervisorName: record.supervisorName,
-            checkIn: record.checkIn,
-            checkOut: record.checkOut,
-            status,
-        };
+        if (record.checkIn && record.checkOut) status = 'مكتمل الحضور';
+        else if (record.checkIn) status = 'حاضر';
+        return { supervisorName: record.supervisorName, checkIn: record.checkIn, checkOut: record.checkOut, status };
     });
 };
 
 const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], teachersInfo: TeacherInfo[]): CombinedTeacherAttendanceEntry[] => {
-    const timeZone = 'Asia/Riyadh';
-
     const teacherIdToNameMap = new Map<number, string>();
     teachersInfo.forEach(t => teacherIdToNameMap.set(t.id, t.name));
-
     const allTeacherIdsForReport = new Set(teachersInfo.map(t => t.id));
 
-    const toRiyadhDateString = (date: Date): string => {
-        const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(date);
-        const year = parts.find(p => p.type === 'year')?.value;
-        const month = parts.find(p => p.type === 'month')?.value;
-        const day = parts.find(p => p.type === 'day')?.value;
-        return `${year}-${month}-${day}`;
+    // Robust helper to get YYYY-MM-DD string from item
+    const getDateString = (item: any): string | null => {
+        // Try date field first
+        const dateVal = item['تاريخ العملية'];
+        if (dateVal && typeof dateVal === 'string') {
+            if (dateVal.match(/^\d{4}-\d{2}-\d{2}$/)) return dateVal;
+            if (dateVal.match(/^\d{4}-\d{2}-\d{2}T/)) return dateVal.split('T')[0];
+        }
+        // Fallback to timestamp
+        const ts = getTimestampFromItem(item);
+        if (ts) {
+            // Use local date string logic manually to ensure YYYY-MM-DD
+            const year = ts.getFullYear();
+            const month = String(ts.getMonth() + 1).padStart(2, '0');
+            const day = String(ts.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        return null;
     };
 
-    const dailyRecords = new Map<string, {
-        teacherId: number;
-        date: string;
-        checkIns: Date[];
-        checkOuts: Date[];
-        notes: Set<string>;
-    }>();
+    const dailyRecords = new Map<string, { teacherId: number; date: string; checkIns: Date[]; checkOuts: Date[]; notes: Set<string>; }>();
 
     data.forEach(item => {
         const teacherId = item.teacher_id;
         if (teacherId == null) return;
+        
+        const dateString = getDateString(item);
+        if (!dateString) return;
 
-        const timestamp = getTimestampFromItem(item);
+        const timestamp = getTimestampFromItem(item); 
         if (!timestamp) return;
 
-        const dateString = toRiyadhDateString(timestamp);
         const mapKey = `${teacherId}/${dateString}`;
 
         if (!dailyRecords.has(mapKey)) {
-            dailyRecords.set(mapKey, {
-                teacherId,
-                date: dateString,
-                checkIns: [],
-                checkOuts: [],
-                notes: new Set(),
-            });
+            dailyRecords.set(mapKey, { teacherId, date: dateString, checkIns: [], checkOuts: [], notes: new Set() });
         }
-
         const record = dailyRecords.get(mapKey)!;
         const note = (item['ملاحظات'] || '').trim();
-        if (note) {
-            record.notes.add(note);
-        }
-
+        if (note) record.notes.add(note);
         const status = (item.status || '').trim();
-        if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
-            record.checkIns.push(timestamp);
-        } else if (status === 'انصراف') {
-            record.checkOuts.push(timestamp);
-        }
+        if (status === 'حضور' || status === 'الحض' || status === 'الحضور') record.checkIns.push(timestamp);
+        else if (status === 'انصراف') record.checkOuts.push(timestamp);
     });
 
     if (data.length > 0 || allTeacherIdsForReport.size > 0) {
-        let minDate: Date | null = null;
-        let maxDate: Date | null = null;
+        let minDateStr: string | null = null;
+        let maxDateStr: string | null = null;
 
-        data.forEach(item => {
-            const timestamp = getTimestampFromItem(item);
-            if (!timestamp || isNaN(timestamp.getTime())) return;
-            if (!minDate || timestamp < minDate) minDate = timestamp;
-            if (!maxDate || timestamp > maxDate) maxDate = timestamp;
+        Array.from(dailyRecords.values()).forEach(rec => {
+            if (!minDateStr || rec.date < minDateStr) minDateStr = rec.date;
+            if (!maxDateStr || rec.date > maxDateStr) maxDateStr = rec.date;
         });
 
         const today = new Date();
-        if (!maxDate || today > maxDate) {
-            maxDate = today;
-        }
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         
-        if (minDate && maxDate) {
-            // Weekends: Thursday (4), Friday (5), Saturday (6)
-            const workingDays = [0, 1, 2, 3]; // Sunday to Wednesday
-            let currentDate = new Date(minDate);
-            currentDate.setHours(0, 0, 0, 0);
+        if (!maxDateStr || todayStr > maxDateStr) maxDateStr = todayStr;
+        
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const oneYearAgoStr = `${oneYearAgo.getFullYear()}-${String(oneYearAgo.getMonth() + 1).padStart(2, '0')}-${String(oneYearAgo.getDate()).padStart(2, '0')}`;
+        
+        if (minDateStr && minDateStr < oneYearAgoStr) minDateStr = oneYearAgoStr;
 
-            while (currentDate <= maxDate) {
+        if (minDateStr && maxDateStr && minDateStr <= maxDateStr) {
+            const workingDays = [0, 1, 2, 3];
+            
+            let currentDate = new Date(minDateStr);
+            let loopSafety = 0;
+            
+            while (loopSafety < 400) {
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                const dateString = `${year}-${month}-${day}`;
+                
+                if (dateString > maxDateStr) break;
+
                 if (workingDays.includes(currentDate.getDay())) {
-                    const dateString = toRiyadhDateString(currentDate);
                     allTeacherIdsForReport.forEach(teacherId => {
                         const mapKey = `${teacherId}/${dateString}`;
                         if (!dailyRecords.has(mapKey)) {
-                            dailyRecords.set(mapKey, {
-                                teacherId,
-                                date: dateString,
-                                checkIns: [],
-                                checkOuts: [],
-                                notes: new Set(),
-                            });
+                            dailyRecords.set(mapKey, { teacherId, date: dateString, checkIns: [], checkOuts: [], notes: new Set() });
                         }
                     });
                 }
                 currentDate.setDate(currentDate.getDate() + 1);
+                loopSafety++;
             }
         }
     }
 
-    return Array.from(dailyRecords.values()).map(record => {
+    let limitedRecords = Array.from(dailyRecords.values());
+    // IMPORTANT: Sort DESCENDING by date first to keep the most recent records
+    limitedRecords.sort((a, b) => b.date.localeCompare(a.date));
+
+    if (limitedRecords.length > 50000) {
+        limitedRecords = limitedRecords.slice(0, 50000);
+    }
+
+    return limitedRecords.map(record => {
         record.checkIns.sort((a, b) => a.getTime() - b.getTime());
         record.checkOuts.sort((a, b) => a.getTime() - b.getTime());
-
-        const timeFormatOptions: Intl.DateTimeFormatOptions = {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-            timeZone: 'Asia/Riyadh'
-        };
+        const timeFormatOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Riyadh' };
         const formatTime = (date: Date | undefined) => date ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', timeFormatOptions).format(date) : null;
-        
-        const firstCheckIn = record.checkIns[0];
-        const lastCheckOut = record.checkOuts[record.checkOuts.length - 1];
-        const teacherName = teacherIdToNameMap.get(record.teacherId) || `المعلم #${record.teacherId}`;
-        
         return {
             id: `${record.teacherId}/${record.date}`,
-            teacherName,
+            teacherId: record.teacherId,
+            teacherName: teacherIdToNameMap.get(record.teacherId) || `المعلم #${record.teacherId}`,
             date: record.date,
-            checkInTime: formatTime(firstCheckIn),
-            checkOutTime: formatTime(lastCheckOut),
+            checkInTime: formatTime(record.checkIns[0]),
+            checkOutTime: formatTime(record.checkOuts[record.checkOuts.length - 1]),
             notes: Array.from(record.notes).join('، '),
         };
-    }).sort((a, b) => {
-        if (a.date > b.date) return -1;
-        if (a.date < b.date) return 1;
-        return a.teacherName.localeCompare(b.teacherName, 'ar');
     });
 };
 
 const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData[], allSupervisors: SupervisorData[]): SupervisorAttendanceReportEntry[] => {
     const timeZone = 'Asia/Riyadh';
-
     const supervisorIdToNameMap = new Map<string, string>();
     allSupervisors.forEach(s => supervisorIdToNameMap.set(s.id, s.supervisorName));
-
     const allSupervisorIdsForReport = new Set(allSupervisors.map(s => s.id));
-    data.forEach(item => {
-        if (item.id) allSupervisorIdsForReport.add(item.id);
-    });
+    data.forEach(item => { if (item.id) allSupervisorIdsForReport.add(item.id); });
 
     const toRiyadhDateString = (date: Date): string => {
         const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(date);
-        const year = parts.find(p => p.type === 'year')?.value;
-        const month = parts.find(p => p.type === 'month')?.value;
-        const day = parts.find(p => p.type === 'day')?.value;
-        return `${year}-${month}-${day}`;
+        return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
     };
 
     const dailyRecords = new Map<string, { supervisorId: string; date: string; checkIn: { time: string, timestamp: Date } | null; checkOut: { time: string, timestamp: Date } | null }>();
 
     data.forEach(item => {
         const supervisorId = item.id;
-        if (!supervisorId) return; // Skip records without an ID
-
+        if (!supervisorId) return;
         const timestamp = getTimestampFromItem(item);
         if (!timestamp) return;
-        
         const timeForDisplay = timestamp.toLocaleTimeString('ar-EG-u-nu-latn', { timeZone, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
         const dateString = toRiyadhDateString(timestamp);
         const mapKey = `${supervisorId}/${dateString}`;
-
         let entry = dailyRecords.get(mapKey);
         if (!entry) {
             entry = { supervisorId, date: dateString, checkIn: null, checkOut: null };
             dailyRecords.set(mapKey, entry);
         }
-        
         const status = (item.status || '').trim();
         if (status === 'حضور' || status === 'الحض' || status === 'الحضور') {
-            if (!entry.checkIn || timestamp < entry.checkIn.timestamp) {
-                entry.checkIn = { time: timeForDisplay, timestamp };
-            }
+            if (!entry.checkIn || timestamp < entry.checkIn.timestamp) entry.checkIn = { time: timeForDisplay, timestamp };
         } else if (status === 'انصراف') {
-            if (!entry.checkOut || timestamp > entry.checkOut.timestamp) {
-                entry.checkOut = { time: timeForDisplay, timestamp };
-            }
+            if (!entry.checkOut || timestamp > entry.checkOut.timestamp) entry.checkOut = { time: timeForDisplay, timestamp };
         }
     });
 
     if (data.length > 0 || allSupervisorIdsForReport.size > 0) {
         let minDate: Date | null = null;
         let maxDate: Date | null = null;
-
         data.forEach(item => {
             const timestamp = getTimestampFromItem(item);
             if (!timestamp || isNaN(timestamp.getTime())) return;
             if (!minDate || timestamp < minDate) minDate = timestamp;
             if (!maxDate || timestamp > maxDate) maxDate = timestamp;
         });
-
         const today = new Date();
-        if (!maxDate || today > maxDate) {
-            maxDate = today;
-        }
+        if (!maxDate || today > maxDate) maxDate = today;
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        if (minDate && minDate < oneYearAgo) minDate = oneYearAgo;
         
-        if (minDate && maxDate) {
-            const workingDays = [0, 1, 2, 3]; // Sunday to Wednesday
+        if (minDate && maxDate && minDate <= maxDate) {
+            const workingDays = [0, 1, 2, 3];
             let currentDate = new Date(minDate);
             currentDate.setHours(0, 0, 0, 0);
-
-            while (currentDate <= maxDate) {
+            let loopSafety = 0;
+            while (currentDate <= maxDate && loopSafety < 400) {
                 if (workingDays.includes(currentDate.getDay())) {
                     const dateString = toRiyadhDateString(currentDate);
                     allSupervisorIdsForReport.forEach(supervisorId => {
@@ -583,22 +545,17 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
                     });
                 }
                 currentDate.setDate(currentDate.getDate() + 1);
+                loopSafety++;
             }
         }
     }
 
-    const report: SupervisorAttendanceReportEntry[] = Array.from(dailyRecords.values()).map(record => ({
+    return Array.from(dailyRecords.values()).map(record => ({
         supervisorName: supervisorIdToNameMap.get(record.supervisorId) || `مشرف #${record.supervisorId}`,
         date: record.date,
         checkInTime: record.checkIn ? record.checkIn.time : null,
         checkOutTime: record.checkOut ? record.checkOut.time : null,
-    }));
-
-    return report.sort((a, b) => {
-        if (a.date > b.date) return -1;
-        if (a.date < b.date) return 1;
-        return a.supervisorName.localeCompare(b.supervisorName, 'ar');
-    });
+    })).sort((a, b) => a.date > b.date ? -1 : 1);
 };
 
 
@@ -608,11 +565,7 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
 
     const normalize = (val: any): string => {
         const str = String(val || '');
-        return str
-            .normalize('NFC')
-            .replace(/[\u200B-\u200D\uFEFF]/g, '')
-            .trim()
-            .replace(/\s+/g, ' ');
+        return str.normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(/\s+/g, ' ');
     };
 
     for (const item of data) {
@@ -621,17 +574,13 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
         const week = normalize(item["الأسبوع"] || item["الاسبوع"]);
 
         let currentKey: string | null = null;
-        
         if (username != null && studentName && week) {
             currentKey = `${username}-${week}`;
             lastKey = currentKey;
         } else {
             currentKey = lastKey;
         }
-        
-        if (!currentKey) {
-            continue;
-        }
+        if (!currentKey) continue;
 
         const memPages = parseAchievement(item["أوجه الحفظ"]);
         const revPages = parseAchievement(item["أوجه المراجه"]);
@@ -643,32 +592,19 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
 
         if (studentWeekMap.has(currentKey)) {
             const existingStudent = studentWeekMap.get(currentKey)!;
-
             existingStudent.memorizationPages.achieved += memPages.achieved;
             existingStudent.memorizationPages.required += memPages.required;
             existingStudent.reviewPages.achieved += revPages.achieved;
             existingStudent.reviewPages.required += revPages.required;
             existingStudent.consolidationPages.achieved += conPages.achieved;
             existingStudent.consolidationPages.required += conPages.required;
-            
             existingStudent.totalPoints += points;
-            
-            if (memLessons) {
-                existingStudent.memorizationLessons = existingStudent.memorizationLessons
-                    ? `${existingStudent.memorizationLessons}, ${memLessons}`
-                    : memLessons;
-            }
-            if (revLessons) {
-                existingStudent.reviewLessons = existingStudent.reviewLessons
-                    ? `${existingStudent.reviewLessons}, ${revLessons}`
-                    : revLessons;
-            }
+            if (memLessons) existingStudent.memorizationLessons = existingStudent.memorizationLessons ? `${existingStudent.memorizationLessons}, ${memLessons}` : memLessons;
+            if (revLessons) existingStudent.reviewLessons = existingStudent.reviewLessons ? `${existingStudent.reviewLessons}, ${revLessons}` : revLessons;
         } else {
             if (!studentName || username == null || !week) continue;
-
             const circle = normalize(item["الحلقة"]);
             const isTabyan = circle.includes('التبيان');
-
             const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
             const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
             const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
@@ -694,60 +630,40 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
             studentWeekMap.set(currentKey, newStudent);
         }
     }
-
     studentWeekMap.forEach(student => {
         student.memorizationPages.formatted = `${student.memorizationPages.achieved.toFixed(1)} / ${student.memorizationPages.required.toFixed(1)}`;
         student.memorizationPages.index = student.memorizationPages.required > 0 ? student.memorizationPages.achieved / student.memorizationPages.required : 0;
-        
         student.reviewPages.formatted = `${student.reviewPages.achieved.toFixed(1)} / ${student.reviewPages.required.toFixed(1)}`;
         student.reviewPages.index = student.reviewPages.required > 0 ? student.reviewPages.achieved / student.reviewPages.required : 0;
-
         student.consolidationPages.formatted = `${student.consolidationPages.achieved.toFixed(1)} / ${student.consolidationPages.required.toFixed(1)}`;
         student.consolidationPages.index = student.consolidationPages.required > 0 ? student.consolidationPages.achieved / student.consolidationPages.required : 0;
     });
-
     return Array.from(studentWeekMap.values());
 };
 
 const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
-    const normalize = (val: any): string => {
-        const str = String(val || '');
-        return str
-            .normalize('NFC')
-            .replace(/[\u200B-\u200D\uFEFF]/g, '')
-            .trim()
-            .replace(/\s+/g, ' ');
-    };
+    const normalize = (val: any): string => String(val || '').normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(/\s+/g, ' ');
 
     return data.map((item, index): ProcessedStudentData | null => {
         const studentName = normalize(item["الطالب"]);
         const usernameRaw = item["اسم المستخدم"];
         if (!studentName || usernameRaw == null) return null;
-
         const username = Number(usernameRaw);
-        
         const circle = normalize(item["الحلقة"]);
         const isTabyan = circle.includes('التبيان');
-
         const memPages = parseAchievement(item["أوجه الحفظ"]);
         const revPages = parseAchievement(item["أوجه المراجه"]);
         const conPages = parseAchievement(item["أوجه التثبيت"]);
-
         const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
         const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
         const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
-        
         finalMemPages.formatted = `${finalMemPages.achieved.toFixed(1)} / ${finalMemPages.required.toFixed(1)}`;
         finalMemPages.index = finalMemPages.required > 0 ? finalMemPages.achieved / finalMemPages.required : 0;
-        
         finalRevPages.formatted = `${finalRevPages.achieved.toFixed(1)} / ${finalRevPages.required.toFixed(1)}`;
         finalRevPages.index = finalRevPages.required > 0 ? finalRevPages.achieved / finalRevPages.required : 0;
-        
         finalConPages.formatted = `${finalConPages.achieved.toFixed(1)} / ${finalConPages.required.toFixed(1)}`;
         finalConPages.index = finalConPages.required > 0 ? finalConPages.achieved / finalConPages.required : 0;
-        
         const day = normalize(item["اليوم"]);
-
         return {
             id: `${username}-${day}-${index}`,
             studentName,
@@ -772,11 +688,9 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
 const processExamData = (data: RawExamData[]): ProcessedExamData[] => {
     const normalize = (val: any): string => String(val || '').trim();
     const parseNum = (val: any): number => Number(val) || 0;
-
     return data.map(item => {
         const studentName = normalize(item["الطالب"]);
         if (!studentName) return null;
-
         return {
             studentName,
             circle: normalize(item["الحلقة"]),
@@ -793,35 +707,24 @@ const processExamData = (data: RawExamData[]): ProcessedExamData[] => {
 
 const processRegisteredStudentData = (data: RawRegisteredStudentData[]): ProcessedRegisteredStudentData[] => {
     const normalize = (val: any): string => String(val || '').trim();
-    return data
-        .map(item => {
+    return data.map(item => {
             const studentName = normalize(item["الطالب"]);
             const circle = normalize(item["الحلقة"]);
             if (!studentName || !circle) return null;
             return { studentName, circle };
-        })
-        .filter((item): item is ProcessedRegisteredStudentData => item !== null);
+        }).filter((item): item is ProcessedRegisteredStudentData => item !== null);
 };
 
 const extractTimeFromSheetDate = (value: string | undefined): string => {
-    if (!value || typeof value !== 'string') {
-        return '';
-    }
-    // Find the HH:mm part in the string.
+    if (!value || typeof value !== 'string') return '';
     const timeMatch = value.match(/\d{2}:\d{2}/);
-    if (timeMatch) {
-        return timeMatch[0]; // Returns "HH:mm"
-    }
-    return '';
+    return timeMatch ? timeMatch[0] : '';
 };
 
 const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-        return {};
-    }
+    if (!data || !Array.isArray(data) || data.length === 0) return {};
     const firstRow = data[0];
     if (!firstRow) return {};
-
     return {
         default_student_count_day: firstRow["اليوم الافتراضي"] || '',
         teacher_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المعلمين"]),
@@ -849,7 +752,12 @@ const App: React.FC = () => {
     const [supervisorAttendance, setSupervisorAttendance] = useState<SupervisorDailyAttendance[]>([]);
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [settings, setSettings] = useState<ProcessedSettingsData>({});
+    
+    // Loading State
     const [isLoading, setIsLoading] = useState(true);
+    const [loadingMessage, setLoadingMessage] = useState("جاري التحميل...");
+    const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
+    
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submittingTeacher, setSubmittingTeacher] = useState<string | null>(null);
     const [submittingSupervisor, setSubmittingSupervisor] = useState<string | null>(null);
@@ -876,128 +784,169 @@ const App: React.FC = () => {
         }
     }, [notification]);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            setError(null);
-            const cacheBuster = `&v=${new Date().getTime()}`;
+    const fetchWithRetry = async (url: string, retries = 2, timeout = 25000) => {
+        for (let i = 0; i <= retries; i++) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            
             try {
-                const allDataResponse = await fetch(`${API_URL}?${cacheBuster.substring(1)}`);
-                if (!allDataResponse.ok) throw new Error(`خطأ في الشبكة: ${allDataResponse.statusText}`);
-                const allDataJson = await allDataResponse.json();
-
-                if (!allDataJson.success) {
-                    throw new Error("فشل في جلب البيانات من المصدر");
-                }
-                
-                const dataContainer = allDataJson.data || {};
-                
-                const allStudentsRaw = dataContainer.report || [];
-                const sanitizedStudentsRaw = allStudentsRaw.map((row: any) => {
-                    const newRow: { [key: string]: any } = {};
-                    Object.keys(row).forEach(key => {
-                        const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
-                        newRow[cleanedKey] = row[key];
-                    });
-                    return newRow;
-                });
-                const processedStudents = processData(sanitizedStudentsRaw as RawStudentData[]);
-                setStudents(processedStudents);
-
-                const dailySheetData = dataContainer.daily;
-                if (dailySheetData && Array.isArray(dailySheetData)) {
-                    const processedDailyStudents = processDailyData(dailySheetData as RawStudentData[]);
-                    setDailyStudents(processedDailyStudents);
-                }
-                
-                const evalQuestionsData = dataContainer.eval;
-                if (evalQuestionsData && Array.isArray(evalQuestionsData)) {
-                    const questions = evalQuestionsData as EvalQuestion[];
-                    setEvalQuestions(questions);
-
-                    const evalResultsData = dataContainer.Eval_result || [];
-                    const { processedResults, headerMap } = processEvalResultsData(evalResultsData as RawEvalResult[], questions);
-                    setEvalResults(processedResults);
-                    setEvalHeaderMap(headerMap);
-                }
-
-                const examSheetData = dataContainer.exam;
-                if (examSheetData && Array.isArray(examSheetData)) {
-                    const processedExams = processExamData(examSheetData as RawExamData[]);
-                    setExamData(processedExams);
-                }
-
-                const registeredStudentData = dataContainer.regstudent;
-                if (registeredStudentData && Array.isArray(registeredStudentData)) {
-                    const processedRegStudents = processRegisteredStudentData(registeredStudentData as RawRegisteredStudentData[]);
-                    setRegisteredStudents(processedRegStudents);
-                }
-
-                const supervisorSheetData = dataContainer['supervisor'];
-                if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
-                    const processedSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
-                    setSupervisors(processedSupervisors);
-                    
-                    const supervisorAttendanceRaw = dataContainer.respon || [];
-                    if (Array.isArray(supervisorAttendanceRaw)) {
-                        const processedDailyAttendance = processSupervisorAttendanceData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], processedSupervisors);
-                        setSupervisorAttendance(processedDailyAttendance);
-                        
-                        const processedReport = processSupervisorAttendanceReportData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], processedSupervisors);
-                        setSupervisorAttendanceReport(processedReport);
-                    }
-                }
-
-                const productorSheetData = dataContainer.productor;
-                if (productorSheetData && Array.isArray(productorSheetData)) {
-                    const processedProductors = processProductorData(productorSheetData as RawProductorData[]);
-                    setProductors(processedProductors);
-                }
-
-                let currentAsrTeachers: TeacherInfo[] = [];
-                const teachersSheetData = dataContainer.teachers;
-                if (teachersSheetData && Array.isArray(teachersSheetData)) {
-                    currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
-                }
-                setTeachersInfo(currentAsrTeachers);
-                
-                const attendanceRaw = dataContainer.attandance || [];
-                if (attendanceRaw && Array.isArray(attendanceRaw)) {
-                    const rawAttendanceData = attendanceRaw as RawTeacherAttendanceData[];
-                    const processedAttendance = processTeacherAttendanceData(rawAttendanceData, currentAsrTeachers);
-                    setTeacherAttendance(processedAttendance);
-
-                    const processedReportLog = processTeacherAttendanceReportData(rawAttendanceData, currentAsrTeachers);
-                    setCombinedTeacherAttendanceLog(processedReportLog);
-                }
-
-                const settingsSheetData = dataContainer.setting;
-                if (settingsSheetData && Array.isArray(settingsSheetData)) {
-                    const sanitizedSettingsRaw = settingsSheetData.map((row: any) => {
-                        const newRow: { [key: string]: any } = {};
-                        Object.keys(row).forEach(key => {
-                            const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
-                            newRow[cleanedKey] = row[key];
-                        });
-                        return newRow;
-                    });
-                    const processedSettings = processSettingsData(sanitizedSettingsRaw as RawSettingData[]);
-                    setSettings(processedSettings);
-                }
-
-            } catch (err) {
-                console.error("فشل في جلب البيانات:", err);
-                setError(err instanceof Error ? err.message : "حدث خطأ غير متوقع");
-            } finally {
-                setIsLoading(false);
+                const response = await fetch(url, { signal: controller.signal });
+                clearTimeout(id);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return await response.json();
+            } catch (err: any) {
+                clearTimeout(id);
+                if (i === retries) throw err;
+                await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
             }
-        };
+        }
+    };
 
-        fetchData();
+    const processAllData = (dataContainer: any) => {
+         const allStudentsRaw = dataContainer.report || [];
+         const sanitizedStudentsRaw = allStudentsRaw.map((row: any) => {
+             const newRow: { [key: string]: any } = {};
+             Object.keys(row).forEach(key => {
+                 const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
+                 newRow[cleanedKey] = row[key];
+             });
+             return newRow;
+         });
+         setStudents(processData(sanitizedStudentsRaw as RawStudentData[]));
+
+         const dailySheetData = dataContainer.daily;
+         if (dailySheetData && Array.isArray(dailySheetData)) {
+             setDailyStudents(processDailyData(dailySheetData as RawStudentData[]));
+         }
+         
+         const evalQuestionsData = dataContainer.eval;
+         if (evalQuestionsData && Array.isArray(evalQuestionsData)) {
+             const questions = evalQuestionsData as EvalQuestion[];
+             setEvalQuestions(questions);
+             const evalResultsData = dataContainer.Eval_result || [];
+             const { processedResults, headerMap } = processEvalResultsData(evalResultsData as RawEvalResult[], questions);
+             setEvalResults(processedResults);
+             setEvalHeaderMap(headerMap);
+         }
+
+         const examSheetData = dataContainer.exam;
+         if (examSheetData && Array.isArray(examSheetData)) {
+             setExamData(processExamData(examSheetData as RawExamData[]));
+         }
+
+         const registeredStudentData = dataContainer.regstudent;
+         if (registeredStudentData && Array.isArray(registeredStudentData)) {
+             setRegisteredStudents(processRegisteredStudentData(registeredStudentData as RawRegisteredStudentData[]));
+         }
+
+         const supervisorSheetData = dataContainer['supervisor'];
+         if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
+             const processedSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
+             setSupervisors(processedSupervisors);
+             
+             const supervisorAttendanceRaw = dataContainer.respon || [];
+             if (Array.isArray(supervisorAttendanceRaw)) {
+                 setSupervisorAttendance(processSupervisorAttendanceData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], processedSupervisors));
+                 setSupervisorAttendanceReport(processSupervisorAttendanceReportData(supervisorAttendanceRaw as RawSupervisorAttendanceData[], processedSupervisors));
+             }
+         }
+
+         const productorSheetData = dataContainer.productor;
+         if (productorSheetData && Array.isArray(productorSheetData)) {
+             setProductors(processProductorData(productorSheetData as RawProductorData[]));
+         }
+
+         let currentAsrTeachers: TeacherInfo[] = [];
+         const teachersSheetData = dataContainer.teachers;
+         if (teachersSheetData && Array.isArray(teachersSheetData)) {
+             currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
+         }
+         setTeachersInfo(currentAsrTeachers);
+         
+         const attendanceRaw = dataContainer.attandance || [];
+         if (attendanceRaw && Array.isArray(attendanceRaw)) {
+             setTeacherAttendance(processTeacherAttendanceData(attendanceRaw as RawTeacherAttendanceData[], currentAsrTeachers));
+             setCombinedTeacherAttendanceLog(processTeacherAttendanceReportData(attendanceRaw as RawTeacherAttendanceData[], currentAsrTeachers));
+         }
+
+         const settingsSheetData = dataContainer.setting;
+         if (settingsSheetData && Array.isArray(settingsSheetData)) {
+             const sanitizedSettingsRaw = settingsSheetData.map((row: any) => {
+                 const newRow: { [key: string]: any } = {};
+                 Object.keys(row).forEach(key => {
+                     const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
+                     newRow[cleanedKey] = row[key];
+                 });
+                 return newRow;
+             });
+             setSettings(processSettingsData(sanitizedSettingsRaw as RawSettingData[]));
+         }
+    };
+
+    const loadFromCache = () => {
+        try {
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                processAllData(parsed);
+                setIsLoading(false);
+                return true;
+            }
+        } catch (e) {
+            console.warn("Failed to load from cache", e);
+        }
+        return false;
+    };
+
+    const saveToCache = (data: any) => {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.warn("Failed to save to cache (Quota Exceeded)", e);
+        }
+    };
+
+    const loadData = async () => {
+        setError(null);
+        const loadedFromCache = loadFromCache();
+        if (loadedFromCache) {
+             setIsBackgroundUpdating(true);
+        } else {
+            setIsLoading(true);
+            setLoadingMessage("جاري جلب البيانات من قاعدة البيانات...");
+        }
+        
+        const cacheBuster = `&v=${new Date().getTime()}`;
+        try {
+            const allDataJson = await fetchWithRetry(`${API_URL}?${cacheBuster.substring(1)}`);
+            if (!allDataJson.success) {
+                throw new Error("فشل في جلب البيانات من المصدر");
+            }
+            const dataContainer = allDataJson.data || {};
+            processAllData(dataContainer);
+            saveToCache(dataContainer);
+            if (loadedFromCache) {
+                setNotification({ message: 'تم تحديث البيانات بنجاح.', type: 'success' });
+            }
+        } catch (err) {
+            console.error("فشل في جلب البيانات:", err);
+            if (!loadedFromCache) {
+                const msg = err instanceof Error ? err.message : "حدث خطأ غير متوقع";
+                setError(msg.includes('aborted') ? "انتهت مهلة الاتصال بالسيرفر." : msg);
+            } else {
+                setNotification({ message: 'فشل تحديث البيانات في الخلفية. يتم عرض نسخة مخزنة.', type: 'error' });
+            }
+        } finally {
+            setIsLoading(false);
+            setIsBackgroundUpdating(false);
+        }
+    };
+
+    useEffect(() => {
+        loadData();
     }, []);
 
     useEffect(() => {
-        // This effect runs after a successful login to authorize the user for the page they intended to visit.
         if (authenticatedUser) {
             if (currentPage === 'settings' && authenticatedUser.role !== 'admin') {
                 setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
@@ -1121,7 +1070,7 @@ const App: React.FC = () => {
             if (riyadhHour > lateHour || (riyadhHour === lateHour && riyadhMinute > lateMinute)) {
                 note = 'حضر متأخر';
             }
-        } else { // action === 'انصراف'
+        } else { 
             if (riyadhHour < earlyHour || (riyadhHour === earlyHour && riyadhMinute < earlyMinute)) {
                 note = 'انصراف مبكر';
             }
@@ -1283,11 +1232,42 @@ const App: React.FC = () => {
         }
     };
 
+    const handleRefreshTeacherData = async () => {
+        setIsBackgroundUpdating(true);
+        try {
+            const cacheBuster = `&v=${new Date().getTime()}`;
+            const [teachersJson, attendanceJson] = await Promise.all([
+                fetchWithRetry(`${API_URL}?sheetName=teachers${cacheBuster}`),
+                fetchWithRetry(`${API_URL}?sheetName=attandance${cacheBuster}`)
+            ]);
+
+            // Handle variable structure from Apps Script
+            const teachersRaw = teachersJson.data?.teachers || teachersJson.teachers || (Array.isArray(teachersJson.data) ? teachersJson.data : []) || [];
+            const attendanceRaw = attendanceJson.data?.attandance || attendanceJson.attandance || (Array.isArray(attendanceJson.data) ? attendanceJson.data : []) || [];
+
+            // Re-process Data
+            const updatedTeachersInfo = processTeachersInfoData(teachersRaw as RawTeacherInfo[]);
+            const updatedAttendanceLog = processTeacherAttendanceReportData(attendanceRaw as RawTeacherAttendanceData[], updatedTeachersInfo);
+            const updatedDailyAttendance = processTeacherAttendanceData(attendanceRaw as RawTeacherAttendanceData[], updatedTeachersInfo);
+
+            // Update State
+            setTeachersInfo(updatedTeachersInfo);
+            setCombinedTeacherAttendanceLog(updatedAttendanceLog);
+            setTeacherAttendance(updatedDailyAttendance);
+
+            setNotification({ message: 'تم تحديث البيانات المعلمين والحضور بنجاح.', type: 'success' });
+        } catch (e) {
+            console.error("Refresh Error:", e);
+            setNotification({ message: 'حدث خطأ أثناء تحديث البيانات.', type: 'error' });
+        } finally {
+            setIsBackgroundUpdating(false);
+        }
+    };
+
     const handleNavigation = (page: Page) => {
         setInitialStudentFilter(null);
         setInitialDailyStudentFilter(null);
 
-        // Unauthenticated access check
         if (!authenticatedUser) {
             if (['evaluation', 'exam', 'settings'].includes(page)) {
                 setCurrentPage(page);
@@ -1295,12 +1275,11 @@ const App: React.FC = () => {
                 setIsMobileSidebarOpen(false);
                 return;
             }
-        } else { // Authenticated user
-            // Role-based access check
+        } else {
             if (page === 'settings' && authenticatedUser.role !== 'admin') {
                 setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
                 setIsMobileSidebarOpen(false);
-                return; // Block navigation
+                return;
             }
             if (page === 'exam' && !['admin', 'exam_teacher'].includes(authenticatedUser.role)) {
                 setNotification({ message: 'هذه الصفحة مخصصة لمعلمي الاختبارات والإدارة فقط.', type: 'error' });
@@ -1310,7 +1289,7 @@ const App: React.FC = () => {
         }
         
         setCurrentPage(page);
-        setShowPasswordModal(false); // Make sure modal is closed if we navigate somewhere else
+        setShowPasswordModal(false);
         setIsMobileSidebarOpen(false);
     };
 
@@ -1327,14 +1306,34 @@ const App: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex flex-col justify-center items-center h-screen bg-stone-50">
-                <img src={LOGO_URL} alt="شعار المجمع" className="w-40 h-40 animate-pulse mb-4" />
-                <p className="text-stone-600 font-semibold">...جاري تحميل البيانات</p>
+                <img src={LOGO_URL} alt="شعار المجمع" className="w-32 h-32 animate-pulse mb-6" />
+                <div className="flex items-center gap-3 text-stone-700 font-semibold text-lg mb-2">
+                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p>{loadingMessage}</p>
+                </div>
+                <p className="text-sm text-stone-500">قد يستغرق التحميل بضع دقائق إذا كانت البيانات كبيرة.</p>
             </div>
         );
     }
     
     if (error) {
-        return <div className="flex justify-center items-center h-screen text-lg text-red-600 bg-red-50 p-4"><p>فشل تحميل البيانات: {error}</p></div>;
+        return (
+            <div className="flex flex-col justify-center items-center h-screen bg-red-50 p-4 text-center">
+                <div className="bg-white p-6 rounded-xl shadow-lg max-w-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h3 className="text-lg font-bold text-red-800 mb-2">فشل تحميل البيانات</h3>
+                    <p className="text-stone-600 mb-6">{error}</p>
+                    <button 
+                        onClick={loadData}
+                        className="w-full px-4 py-2 bg-amber-500 text-white rounded-md font-semibold hover:bg-amber-600 transition-colors"
+                    >
+                        إعادة المحاولة
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     const titles = {
@@ -1390,7 +1389,12 @@ const App: React.FC = () => {
             case 'teacherAttendance':
                 return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} authenticatedUser={authenticatedUser} />;
             case 'teacherAttendanceReport':
-                return <TeacherAttendanceReportPage reportData={combinedTeacherAttendanceLog} />;
+                return <TeacherAttendanceReportPage 
+                            reportData={combinedTeacherAttendanceLog} 
+                            // teachersList={asrTeachersInfo} removed prop
+                            onRefresh={handleRefreshTeacherData}
+                            isRefreshing={isBackgroundUpdating}
+                       />;
             case 'supervisorAttendance':
                 return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} authenticatedUser={authenticatedUser} />;
             case 'supervisorAttendanceReport':
@@ -1444,7 +1448,17 @@ const App: React.FC = () => {
 
             <main className={`flex-1 flex flex-col overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'lg:mr-20' : 'lg:mr-64'}`}>
                 <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-4 md:p-6 border-b border-stone-200 flex justify-between items-center">
-                    <h1 className="text-xl md:text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
+                     <div className="flex items-center gap-3">
+                        <h1 className="text-xl md:text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
+                        {isBackgroundUpdating && (
+                            <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-100 px-2 py-1 rounded-full animate-pulse">
+                                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                جاري التحديث...
+                            </span>
+                        )}
+                    </div>
                     <button
                         className="lg:hidden p-2 text-stone-600 hover:bg-stone-100 rounded-md"
                         onClick={() => setIsMobileSidebarOpen(true)}
@@ -1462,7 +1476,6 @@ const App: React.FC = () => {
                     onSuccess={(user) => {
                         setAuthenticatedUser(user);
                         setShowPasswordModal(false);
-                        // Re-check authorization for the page they intended to visit
                         if (currentPage === 'settings' && user.role !== 'admin') {
                             setNotification({ message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.', type: 'error' });
                             setCurrentPage('general');
@@ -1473,7 +1486,6 @@ const App: React.FC = () => {
                     }}
                     onClose={() => {
                         setShowPasswordModal(false);
-                        // If user closes modal without logging in, redirect from protected page
                         if (['evaluation', 'exam', 'settings'].includes(currentPage)) {
                             setCurrentPage('general');
                         }

@@ -224,6 +224,7 @@ export interface TeacherAttendanceReportEntry {
 }
 
 export interface TeacherAttendanceSummaryEntry {
+  teacherId: number;
   teacherName: string;
   presentDays: number;
   absentDays: number;
@@ -300,6 +301,7 @@ export interface ProductorData {
 
 export interface CombinedTeacherAttendanceEntry {
   id: string;
+  teacherId: number;
   teacherName: string;
   date: string;
   checkInTime: string | null;
