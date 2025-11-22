@@ -297,9 +297,7 @@ const getTimestampFromItem = (item: RawTeacherAttendanceData | RawSupervisorAtte
             }
 
             const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-            // Remove manual shift to keep raw timestamp logic cleaner
-            // utcDate.setUTCHours(utcDate.getUTCHours() - 3); 
-
+            
             if (isValidDate(utcDate)) {
                 timestamp = utcDate;
             }
@@ -808,7 +806,6 @@ const App: React.FC = () => {
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [settings, setSettings] = useState<ProcessedSettingsData>({});
     
-    // Loading State
     const [isLoading, setIsLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState("جاري التحميل...");
     const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
@@ -938,12 +935,11 @@ const App: React.FC = () => {
          }
     };
 
-    const loadFromCache = () => {
+    const loadFromCache = async () => {
         try {
-            const cached = localStorage.getItem(CACHE_KEY);
+            const cached = await getFromDB(CACHE_KEY);
             if (cached) {
-                const parsed = JSON.parse(cached);
-                processAllData(parsed);
+                processAllData(cached);
                 setIsLoading(false);
                 return true;
             }
@@ -953,9 +949,9 @@ const App: React.FC = () => {
         return false;
     };
 
-    const saveToCache = (data: any) => {
+    const saveToCache = async (data: any) => {
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            await saveToDB(CACHE_KEY, data);
         } catch (e) {
             console.warn("Failed to save to cache (Quota Exceeded)", e);
         }
@@ -963,7 +959,8 @@ const App: React.FC = () => {
 
     const loadData = async () => {
         setError(null);
-        const loadedFromCache = loadFromCache();
+        const loadedFromCache = await loadFromCache();
+        
         if (loadedFromCache) {
              setIsBackgroundUpdating(true);
         } else {
@@ -1310,7 +1307,16 @@ const App: React.FC = () => {
             setCombinedTeacherAttendanceLog(updatedAttendanceLog);
             setTeacherAttendance(updatedDailyAttendance);
 
-            setNotification({ message: 'تم تحديث البيانات المعلمين والحضور بنجاح.', type: 'success' });
+            // Update DB Cache for persistence
+            const currentCache = await getFromDB(CACHE_KEY) || {};
+            const newCache = {
+                ...currentCache,
+                teachers: teachersRaw,
+                attandance: attendanceRaw
+            };
+            await saveToDB(CACHE_KEY, newCache);
+
+            setNotification({ message: 'تم تحديث بيانات المعلمين والحضور بنجاح.', type: 'success' });
         } catch (e) {
             console.error("Refresh Error:", e);
             setNotification({ message: 'حدث خطأ أثناء تحديث البيانات.', type: 'error' });
