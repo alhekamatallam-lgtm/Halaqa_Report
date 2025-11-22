@@ -414,22 +414,18 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
     teachersInfo.forEach(t => teacherIdToNameMap.set(t.id, t.name));
     const allTeacherIdsForReport = new Set(teachersInfo.map(t => t.id));
 
-    // Robust helper to get YYYY-MM-DD string from item
     const getDateString = (item: any): string | null => {
-        // Try date field first
         const dateVal = item['تاريخ العملية'];
         if (dateVal && typeof dateVal === 'string') {
             if (dateVal.match(/^\d{4}-\d{2}-\d{2}$/)) return dateVal;
             if (dateVal.match(/^\d{4}-\d{2}-\d{2}T/)) return dateVal.split('T')[0];
         }
-        // Fallback to timestamp
         const ts = getTimestampFromItem(item);
         if (ts) {
-            // Use local date string logic manually to ensure YYYY-MM-DD
-            const year = ts.getFullYear();
-            const month = String(ts.getMonth() + 1).padStart(2, '0');
-            const day = String(ts.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+             const year = ts.getFullYear();
+             const month = String(ts.getMonth() + 1).padStart(2, '0');
+             const day = String(ts.getDate()).padStart(2, '0');
+             return `${year}-${month}-${day}`;
         }
         return null;
     };
@@ -806,6 +802,7 @@ const App: React.FC = () => {
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [settings, setSettings] = useState<ProcessedSettingsData>({});
     
+    // Loading State
     const [isLoading, setIsLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState("جاري التحميل...");
     const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
@@ -1507,7 +1504,7 @@ const App: React.FC = () => {
                  <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)} aria-hidden="true"></div>
             )}
 
-            <main className={`flex-1 flex flex-col overflow-y-auto transition-all duration-300 ${isSidebarCollapsed ? 'lg:mr-20' : 'lg:mr-64'}`}>
+            <main className="flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300">
                 <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-4 md:p-6 border-b border-stone-200 flex justify-between items-center">
                      <div className="flex items-center gap-3">
                         <h1 className="text-xl md:text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
