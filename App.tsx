@@ -31,6 +31,61 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzUUEJKndeH57my0QQd7Ust
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
 const CACHE_KEY = 'quran_app_data_v1';
 
+// --- IndexedDB Helpers ---
+const DB_NAME = 'QuranAppDB';
+const STORE_NAME = 'dataStore';
+const DB_VERSION = 1;
+
+const initDB = (): Promise<IDBDatabase> => {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+            reject(new Error("IndexedDB not supported"));
+            return;
+        }
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+    });
+};
+
+const getFromDB = async (key: string): Promise<any> => {
+    try {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORE_NAME, 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get(key);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+        });
+    } catch (e) {
+        console.warn("Error reading from IndexedDB:", e);
+        return null;
+    }
+};
+
+const saveToDB = async (key: string, data: any): Promise<void> => {
+    try {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORE_NAME, 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.put(data, key);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    } catch (e) {
+        console.warn("Error saving to IndexedDB:", e);
+    }
+};
+// -------------------------
+
 const normalizeArabicForMatch = (text: string) => {
     if (!text) return '';
     return text
