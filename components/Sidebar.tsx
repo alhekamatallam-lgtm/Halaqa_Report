@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { 
     HomeIcon, 
@@ -20,7 +19,7 @@ import {
 } from './icons';
 import type { AuthenticatedUser } from '../types';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 interface SidebarProps {
   currentPage: Page;
@@ -103,9 +102,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
                  </NavSection>
                  
                  <NavSection title="الحضور والإنصراف" isCollapsed={isCollapsed}>
-                    <NavLink label="حضور المعلمين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'teacherAttendance'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherAttendance')} />
+                    <NavLink label="حضور الموظفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'combinedAttendance'} isCollapsed={isCollapsed} onClick={() => onNavigate('combinedAttendance')} />
                     <NavLink label="تقرير حضور المعلمين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'teacherAttendanceReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherAttendanceReport')} />
-                    <NavLink label="حضور المشرفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'supervisorAttendance'} isCollapsed={isCollapsed} onClick={() => onNavigate('supervisorAttendance')} />
                     <NavLink label="تقرير حضور المشرفين" icon={<CalendarDaysIcon className="w-5 h-5" />} isActive={currentPage === 'supervisorAttendanceReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('supervisorAttendanceReport')} />
                     <NavLink label="قائمة المعلمين" icon={<IdentificationIcon className="w-5 h-5" />} isActive={currentPage === 'teacherList'} isCollapsed={isCollapsed} onClick={() => onNavigate('teacherList')} />
                  </NavSection>

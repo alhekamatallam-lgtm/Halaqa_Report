@@ -11,6 +11,7 @@ import ExcellencePage from './pages/ExcellencePage';
 import TeacherAttendancePage from './pages/TeacherAttendancePage';
 import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
 import SupervisorAttendancePage from './pages/SupervisorAttendancePage';
+import CombinedAttendancePage from './pages/CombinedAttendancePage';
 import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
 import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
@@ -783,7 +784,7 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
     };
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'teacherAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendance' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
@@ -833,6 +834,7 @@ const App: React.FC = () => {
         }
     }, [notification]);
 
+    // ... (fetchWithRetry, processAllData, loadFromCache, saveToCache, loadData, handlePostEvaluation, handlePostExam, handlePostTeacherAttendance, handlePostSupervisorAttendance, handlePostSettings, handleRefreshTeacherData - ALL UNCHANGED)
     const fetchWithRetry = async (url: string, retries = 2, timeout = 25000) => {
         for (let i = 0; i <= retries; i++) {
             const controller = new AbortController();
@@ -1403,9 +1405,9 @@ const App: React.FC = () => {
         notes: 'ملاحظات الطلاب',
         evaluation: `زيارات الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
         excellence: 'تميز الحلقات',
-        teacherAttendance: `حضور وانصراف المعلمين`,
+        combinedAttendance: `حضور الموظفين`,
+        teacherAttendance: `حضور وانصراف المعلمين`, // Keep mapping for legacy ref
         teacherAttendanceReport: 'تقرير حضور المعلمين',
-        supervisorAttendance: `حضور المشرفين`,
         supervisorAttendanceReport: 'تقرير حضور المشرفين',
         dailyStudents: 'التقرير اليومي (طلاب)',
         dailyCircles: 'التقرير اليومي (حلقات)',
@@ -1444,17 +1446,25 @@ const App: React.FC = () => {
                     settings={settings} />;
             case 'excellence':
                 return <ExcellencePage students={students} supervisors={supervisors} />;
-            case 'teacherAttendance':
-                return <TeacherAttendancePage allTeachers={asrTeachersInfo} attendanceStatus={teacherAttendance} onSubmit={handlePostTeacherAttendance} isSubmitting={isSubmitting} submittingTeacher={submittingTeacher} authenticatedUser={authenticatedUser} />;
+            case 'combinedAttendance':
+                return <CombinedAttendancePage 
+                    allTeachers={asrTeachersInfo}
+                    teacherAttendanceStatus={teacherAttendance}
+                    onTeacherSubmit={handlePostTeacherAttendance}
+                    submittingTeacher={submittingTeacher}
+                    allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))}
+                    supervisorAttendanceStatus={supervisorAttendance}
+                    onSupervisorSubmit={handlePostSupervisorAttendance}
+                    submittingSupervisor={submittingSupervisor}
+                    isSubmitting={isSubmitting}
+                    authenticatedUser={authenticatedUser}
+                />;
             case 'teacherAttendanceReport':
                 return <TeacherAttendanceReportPage 
                             reportData={combinedTeacherAttendanceLog} 
-                            // teachersList={asrTeachersInfo} removed prop
                             onRefresh={handleRefreshTeacherData}
                             isRefreshing={isBackgroundUpdating}
                        />;
-            case 'supervisorAttendance':
-                return <SupervisorAttendancePage allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))} attendanceStatus={supervisorAttendance} onSubmit={handlePostSupervisorAttendance} isSubmitting={isSubmitting} submittingSupervisor={submittingSupervisor} authenticatedUser={authenticatedUser} />;
             case 'supervisorAttendanceReport':
                 return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
             case 'dailyStudents':
@@ -1504,7 +1514,7 @@ const App: React.FC = () => {
                  <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)} aria-hidden="true"></div>
             )}
 
-            <main className="flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300">
+            <main className={`flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300`}>
                 <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-4 md:p-6 border-b border-stone-200 flex justify-between items-center">
                      <div className="flex items-center gap-3">
                         <h1 className="text-xl md:text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
