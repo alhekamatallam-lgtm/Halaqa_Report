@@ -113,12 +113,6 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
       return;
     }
 
-    const allQuestionsAnswered = evalQuestions.every(q => scores[q.id] !== undefined && scores[q.id] !== '');
-    if (!allQuestionsAnswered) {
-        setError('الرجاء إدخال درجة لجميع الأسئلة.');
-        return;
-    }
-
     setError(null);
 
     const payload: EvalSubmissionPayload = {
@@ -129,10 +123,8 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
 
     evalQuestions.forEach(q => {
         const header = evalHeaderMap.get(q.id);
-        // Use the mapped header which is the source of truth for the column name.
-        // Fallback to the question text from `eval` sheet if map is somehow incomplete.
         const payloadKey = header || q.que.trim();
-        payload[payloadKey] = scores[q.id]!;
+        payload[payloadKey] = Number(scores[q.id] || 0);
     });
     
     await onSubmit(payload);
@@ -173,7 +165,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
                         <input
                             type="number"
                             id={`q-${q.id}`}
-                            value={scores[q.id] || ''}
+                            value={scores[q.id] ?? 0}
                             onChange={e => handleScoreChange(q.id, e.target.value, q.mark)}
                             min="0"
                             max={q.mark}
