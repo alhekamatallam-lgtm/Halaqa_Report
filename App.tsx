@@ -28,7 +28,7 @@ import Notification from './components/Notification';
 import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData, CombinedTeacherAttendanceEntry, AuthenticatedUser } from './types';
 import { MenuIcon } from './components/icons';
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzUUEJKndeH57my0QQd7UstCbsU6BftKOqR6vb83QkHN9tkGT3MTKuc16Zs8U43P8b1/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxbmwdJKfAZmeStYZv82hmNJkC1je_bY0IcfiJ1fhfo8Qz7I-b10Mb1Z-EcCpbjnTA/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
 const CACHE_KEY = 'quran_app_data_v1';
 
