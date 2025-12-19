@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import type { ProcessedStudentData } from '../types';
@@ -93,8 +94,9 @@ const StudentFollowUpPage: React.FC<{ students: ProcessedStudentData[] }> = ({ s
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      // FIX: Updated model name to 'gemini-3-flash-preview' for basic text tasks as per guidelines.
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
       });
 

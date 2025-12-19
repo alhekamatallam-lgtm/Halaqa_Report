@@ -91,11 +91,11 @@ const normalizeArabicForMatch = (text: string) => {
     if (!text) return '';
     return text
         .normalize('NFC')
-        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
-        .replace(/\s+/g, ' ') // Standardize whitespace
-        .replace(/[إأآا]/g, 'ا') // Unify Alif
-        .replace(/[يى]/g, 'ي')     // Unify Ya
-        .replace(/ة/g, 'ه')       // Unify Ta Marbuta
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/[إأآا]/g, 'ا')
+        .replace(/[يى]/g, 'ي')
+        .replace(/ة/g, 'ه')
         .trim();
 };
 
@@ -115,19 +115,25 @@ const parseAchievement = (value: any): Achievement => {
   };
 };
 
+/**
+ * Strict parser for "Attendance Percentage" (نسبة الحضور) column.
+ * Converts "100%", "85", "0.85" all to 0.0 - 1.0 range.
+ */
 const parsePercentage = (value: any): number => {
-    if (typeof value === 'number') {
-        return value > 1 ? value / 100 : value;
-    }
-
-    const strValue = String(value || '0').trim();
+    if (value === undefined || value === null || value === '') return 0;
+    
+    let strValue = String(value).trim();
+    
+    // Handle "%" symbol
     if (strValue.endsWith('%')) {
-        return (parseFloat(strValue.slice(0, -1)) || 0) / 100;
+        return (parseFloat(strValue.replace('%', '')) || 0) / 100;
     }
     
     const numValue = parseFloat(strValue);
     if (isNaN(numValue)) return 0;
 
+    // Logic: Values > 1 (e.g., 90) are treated as percentages (90/100 = 0.9).
+    // Values <= 1 (e.g., 0.9) are treated as fractions already.
     return numValue > 1 ? numValue / 100 : numValue;
 };
 
@@ -241,23 +247,16 @@ const processTeachersInfoData = (data: RawTeacherInfo[]): TeacherInfo[] => {
         .filter(item => !isNaN(item.id) && item.name);
 };
 
-/**
- * REBUILT: Teacher Attendance Report Processor
- * Based on Link by teacher_id, Group by Date, first/last movement logic.
- */
 const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], teachersInfo: TeacherInfo[]): CombinedTeacherAttendanceEntry[] => {
-    // 1. Setup Lookup for Teacher Info
     const teacherLookup = new Map<number, TeacherInfo>();
     teachersInfo.forEach(t => teacherLookup.set(t.id, t));
 
-    // 2. Group records by teacher_id and Raw Date string
-    // Key: id|date
     const groupMap = new Map<string, { id: number, date: string, times: string[] }>();
 
     data.forEach(item => {
         const id = Number(item.teacher_id);
-        const rawDate = String(item['تاريخ العملية'] || '').trim().split(' ')[0]; // Extract YYYY-MM-DD
-        const rawTime = String(item['وقت العملية'] || '').trim().split(' ').pop() || ''; // Extract HH:mm:ss
+        const rawDate = String(item['تاريخ العملية'] || '').trim().split(' ')[0]; 
+        const rawTime = String(item['وقت العملية'] || '').trim().split(' ').pop() || ''; 
 
         if (isNaN(id) || !rawDate || !rawTime) return;
 
@@ -268,16 +267,13 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
         groupMap.get(key)!.times.push(rawTime);
     });
 
-    // 3. Transform to Final Report Format
     const report: CombinedTeacherAttendanceEntry[] = [];
 
     groupMap.forEach((group, key) => {
         const info = teacherLookup.get(group.id);
-        if (!info) return; // Skip if ID not in our teachers list
+        if (!info) return; 
 
-        // Sort times alphabetically (HH:mm:ss works for simple string sort)
         const sortedTimes = group.times.sort();
-        
         const checkInTime = sortedTimes[0];
         const checkOutTime = sortedTimes.length > 1 ? sortedTimes[sortedTimes.length - 1] : null;
 
@@ -294,7 +290,6 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
         });
     });
 
-    // Final sort: Date Descending
     return report.sort((a, b) => b.date.localeCompare(a.date));
 };
 
@@ -315,7 +310,7 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
         if (dateStr.includes(todayRiyadhStr)) {
             const record = teacherRecords.get(id)!;
             const status = (item.status || '').trim();
-            if (status === 'حضور' || status === 'الحضور') record.checkIn = new Date(); // Marker for UI
+            if (status === 'حضور' || status === 'الحضور') record.checkIn = new Date(); 
             else if (status === 'انصراف') record.checkOut = new Date();
         }
     });
@@ -409,7 +404,11 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
 
 
 const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
-    const studentWeekMap = new Map<string, ProcessedStudentData>();
+    const studentWeekMap = new Map<string, {
+        data: ProcessedStudentData;
+        attendanceSum: number;
+        recordCount: number;
+    }>();
     let lastKey: string | null = null;
 
     const normalize = (val: any): string => {
@@ -431,16 +430,17 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
         }
         if (!currentKey) continue;
 
+        const attendance = parsePercentage(item["نسبة الحضور"]);
         const memPages = parseAchievement(item["أوجه الحفظ"]);
         const revPages = parseAchievement(item["أوجه المراجه"]);
         const conPages = parseAchievement(item["أوجه التثبيت"]);
         const points = Number(item["اجمالي النقاط"]) || 0;
-        const attendance = parsePercentage(item["نسبة الحضور"]);
         const memLessons = normalize(item["دروس الحفظ"]);
         const revLessons = normalize(item["دروس المراجعة"]);
 
         if (studentWeekMap.has(currentKey)) {
-            const existingStudent = studentWeekMap.get(currentKey)!;
+            const entry = studentWeekMap.get(currentKey)!;
+            const existingStudent = entry.data;
             existingStudent.memorizationPages.achieved += memPages.achieved;
             existingStudent.memorizationPages.required += memPages.required;
             existingStudent.reviewPages.achieved += revPages.achieved;
@@ -448,6 +448,11 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
             existingStudent.consolidationPages.achieved += conPages.achieved;
             existingStudent.consolidationPages.required += conPages.required;
             existingStudent.totalPoints += points;
+            
+            // Collect for precise attendance average from column
+            entry.attendanceSum += attendance;
+            entry.recordCount += 1;
+
             if (memLessons) existingStudent.memorizationLessons = existingStudent.memorizationLessons ? `${existingStudent.memorizationLessons}, ${memLessons}` : memLessons;
             if (revLessons) existingStudent.reviewLessons = existingStudent.reviewLessons ? `${existingStudent.reviewLessons}, ${revLessons}` : revLessons;
         } else {
@@ -471,23 +476,28 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
                 consolidationPages: finalConPages,
                 teacherName: normalize(item["اسم المعلم"]),
                 program: normalize(item["البرنامج"]),
-                attendance: attendance,
+                attendance: attendance, 
                 totalPoints: points,
                 guardianMobile: normalize(item["جوال ولي الأمر"]),
                 week: week,
             };
-            studentWeekMap.set(currentKey, newStudent);
+            studentWeekMap.set(currentKey, { data: newStudent, attendanceSum: attendance, recordCount: 1 });
         }
     }
-    studentWeekMap.forEach(student => {
+    
+    return Array.from(studentWeekMap.values()).map(entry => {
+        const student = entry.data;
+        // Final precise attendance average from multiple entries in the same week
+        student.attendance = entry.attendanceSum / entry.recordCount;
+        
         student.memorizationPages.formatted = `${student.memorizationPages.achieved.toFixed(1)} / ${student.memorizationPages.required.toFixed(1)}`;
         student.memorizationPages.index = student.memorizationPages.required > 0 ? student.memorizationPages.achieved / student.memorizationPages.required : 0;
         student.reviewPages.formatted = `${student.reviewPages.achieved.toFixed(1)} / ${student.reviewPages.required.toFixed(1)}`;
         student.reviewPages.index = student.reviewPages.required > 0 ? student.reviewPages.achieved / student.reviewPages.required : 0;
         student.consolidationPages.formatted = `${student.consolidationPages.achieved.toFixed(1)} / ${student.consolidationPages.required.toFixed(1)}`;
         student.consolidationPages.index = student.consolidationPages.required > 0 ? student.consolidationPages.achieved / student.consolidationPages.required : 0;
+        return student;
     });
-    return Array.from(studentWeekMap.values());
 };
 
 const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
@@ -526,7 +536,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             consolidationPages: finalConPages,
             teacherName: normalize(item["اسم المعلم"]),
             program: normalize(item["البرنامج"]),
-            attendance: parsePercentage(item["نسبة الحضور"]),
+            attendance: parsePercentage(item["نسبة الحضور"]), // Direct from column
             totalPoints: Number(item["اجمالي النقاط"]) || 0,
             guardianMobile: normalize(item["جوال ولي الأمر"]),
             day: day,
@@ -580,6 +590,7 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
         teacher_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمعلمين"]),
         supervisor_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المشرفين"]),
         supervisor_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمشرفين"]),
+        avg_attendance: String(firstRow["متوسط الحضور"] || '0'),
     };
 };
 

@@ -273,6 +273,7 @@ export interface RawSettingData {
   "وقت انصراف مبكر للمعلمين": string;
   "وقت تأخر حضور المشرفين"?: string;
   "وقت انصراف مبكر للمشرفين"?: string;
+  "متوسط الحضور"?: number | string;
 }
 
 export type ProcessedSettingsData = Record<string, string>;

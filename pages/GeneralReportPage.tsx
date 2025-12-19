@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import type { ProcessedStudentData, GeneralReportStats, ProcessedSettingsData } from '../types';
 
@@ -63,17 +64,23 @@ const parseDateFromDayString = (dayString: string): Date => {
 const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStudents: ProcessedStudentData[], settings: ProcessedSettingsData }> = ({ students, dailyStudents, settings }) => {
 
   const { stats, targetDayLabel } = useMemo(() => {
+    // تحديد اليوم المستهدف للفلترة في بطاقة "عدد الطلاب" فقط
     const dayOptions = Array.from(new Set<string>(dailyStudents.map(s => s.day).filter((d): d is string => !!d)))
         .sort((a, b) => parseDateFromDayString(b).getTime() - parseDateFromDayString(a).getTime());
 
     const targetDay = settings.default_student_count_day || (dayOptions.length > 0 ? dayOptions[0] : null);
     
-    const dailyStudentsForTargetDay = targetDay ? dailyStudents.filter(s => s.day === targetDay) : [];
-    
-    const totalStudentsForTargetDay = new Set(dailyStudentsForTargetDay.map(s => s.studentName)).size;
-    const totalAttendanceForDay = dailyStudentsForTargetDay.reduce((sum, s) => sum + s.attendance, 0);
-    const avgAttendanceForDay = dailyStudentsForTargetDay.length > 0 ? totalAttendanceForDay / dailyStudentsForTargetDay.length : 0;
+    // فلترة عدد الطلاب لليوم المختار فقط
+    const studentCountForTargetDay = targetDay 
+        ? dailyStudents.filter(s => s.day === targetDay).length 
+        : 0;
 
+    // --- المنطق: قراءة المتوسط مباشرة من الإعدادات المستلمة من ورقة Setting ---
+    const rawAvg = parseFloat(settings.avg_attendance || '0');
+    // إذا كانت القيمة > 1 (مثل 82.88) نحولها لكسر 0.8288 لتعمل مع العمليات الحسابية
+    const finalAvgAttendance = rawAvg > 1 ? rawAvg / 100 : rawAvg;
+
+    // حساب الإحصائيات العامة من ورقة التقارير (students)
     const totalCircles = new Set(students.map(s => s.circle)).size;
     const totalMemorization = students.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
     const totalReview = students.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
@@ -82,17 +89,17 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStude
 
     const finalStats: GeneralReportStats = {
       totalCircles,
-      totalStudents: totalStudentsForTargetDay,
+      totalStudents: studentCountForTargetDay,
       totalMemorization,
       totalReview,
       totalConsolidation,
       totalAchievement,
-      avgAttendance: avgAttendanceForDay,
+      avgAttendance: finalAvgAttendance,
     };
 
     return {
         stats: finalStats,
-        targetDayLabel: targetDay || 'لم يحدد يوم',
+        targetDayLabel: targetDay || 'لم يحدد',
     };
   }, [students, dailyStudents, settings]);
 
@@ -101,13 +108,15 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStude
       <StatCard icon={<CircleIcon />} label="إجمالي الحلقات" value={stats.totalCircles} description="جميع الحلقات الفعالة" />
       <StatCard 
         icon={<StudentIcon />} 
-        label={`عدد الطلاب (${targetDayLabel})`}
+        label="عدد الطلاب" 
         value={stats.totalStudents} 
+        description={`لليوم المختار: ${targetDayLabel}`}
       />
       <StatCard 
         icon={<AttendanceIcon />} 
-        label={`متوسط الحضور (${targetDayLabel})`} 
+        label="متوسط الحضور العام" 
         value={`${(stats.avgAttendance * 100).toFixed(1)}%`} 
+        // تم مسح الهنت بناءً على طلب المستخدم
       />
       
       <StatCard icon={<BookIcon />} label="إجمالي الحفظ" value={stats.totalMemorization.toFixed(1)} description="مجموع أوجه الحفظ لجميع الأسابيع" />
