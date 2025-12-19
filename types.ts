@@ -1,5 +1,4 @@
 
-
 export interface RawStudentData {
   "الطالب": string;
   "اسم المستخدم": number;
@@ -79,7 +78,6 @@ export interface GeneralReportStats {
   avgAttendance: number;
 }
 
-// FIX: Added missing type definitions for evaluation-related components.
 export interface CircleEvaluationData {
   circleName: string;
   discipline: number;
@@ -134,7 +132,6 @@ export interface ProcessedEvalResult {
     }[];
 }
 
-
 export interface ExamSubmissionData {
     "الطالب": string;
     "الحلقة": string;
@@ -185,20 +182,24 @@ export interface SupervisorData {
   circles: string[];
 }
 
+export interface SupervisorInfo {
+  id: string;
+  name: string;
+}
+
 export interface RawTeacherAttendanceData {
-  "teacher_id"?: number;
-  "time"?: string;
+  "teacher_id": number;
+  "name": string;
+  "status": string;
   "تاريخ العملية": string;
   "وقت العملية": string;
-  "name": string;
-  "status": 'حضور' | 'انصراف';
-  "ملاحظات"?: string;
 }
 
 export interface TeacherInfo {
   id: number;
   name: string;
   circle: string;
+  circleTime: string;
 }
 
 export interface RawTeacherInfo {
@@ -216,47 +217,36 @@ export interface TeacherDailyAttendance {
   notes?: string;
 }
 
-export interface TeacherAttendanceReportEntry {
-  teacherName: string;
-  date: string;
-  checkInTime: string | null;
-  checkOutTime: string | null;
-}
-
 export interface TeacherAttendanceSummaryEntry {
   teacherId: number;
   teacherName: string;
   presentDays: number;
-  absentDays: number;
   attendanceRate: number;
 }
 
 export interface RawSupervisorAttendanceData {
-  "id"?: string;
-  "time"?: string;
+  "id": string;
+  "name": string;
+  "status": string;
   "تاريخ العملية": string;
   "وقت العملية": string;
-  "name": string;
-  "status": 'حضور' | 'انصراف' | 'الحضور';
 }
 
 export interface SupervisorAttendanceReportEntry {
+  supervisorId: string;
   supervisorName: string;
+  circle: string;
   date: string;
   checkInTime: string | null;
   checkOutTime: string | null;
+  status: 'حاضر';
 }
 
 export interface SupervisorAttendanceSummaryEntry {
+  supervisorId: string;
   supervisorName: string;
   presentDays: number;
-  absentDays: number;
   attendanceRate: number;
-}
-
-export interface SupervisorInfo {
-  id: string;
-  name: string;
 }
 
 export interface SupervisorDailyAttendance {
@@ -303,10 +293,12 @@ export interface CombinedTeacherAttendanceEntry {
   id: string;
   teacherId: number;
   teacherName: string;
+  circles: string;
+  circleTime: string;
   date: string;
   checkInTime: string | null;
   checkOutTime: string | null;
-  notes: string;
+  status: 'حاضر';
 }
 
 export type AuthenticatedUser = {
