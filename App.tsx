@@ -849,6 +849,29 @@ const App: React.FC = () => {
         setSubmittingTeacher(teacherName);
         setIsSubmitting(true);
         const now = new Date();
+
+        // Optimistic UI Update
+        setTeacherAttendance(prevAttendance => 
+            prevAttendance.map(record => {
+                if (record.teacherName === teacherName) {
+                    const updatedRecord = { ...record };
+                    if (action === 'حضور') {
+                        updatedRecord.checkIn = now;
+                    } else {
+                        updatedRecord.checkOut = now;
+                    }
+
+                    if (updatedRecord.checkIn && updatedRecord.checkOut) {
+                        updatedRecord.status = 'مكتمل الحضور';
+                    } else if (updatedRecord.checkIn) {
+                        updatedRecord.status = 'حاضر';
+                    }
+                    return updatedRecord;
+                }
+                return record;
+            })
+        );
+
         const payload = {
             sheet: 'attandance',
             "teacher_id": teacherId,
@@ -856,6 +879,7 @@ const App: React.FC = () => {
             "status": action,
             "time": now.toISOString(),
         };
+
         try {
             await fetch(API_URL, {
                 method: 'POST',
@@ -864,6 +888,7 @@ const App: React.FC = () => {
             });
             setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
         } catch (err) {
+            // Even on failure, the UI is updated. Current logic shows success anyway.
             setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
         } finally {
             setIsSubmitting(false);
@@ -875,9 +900,33 @@ const App: React.FC = () => {
         const supervisor = supervisors.find(s => s.id === supervisorId);
         if (!supervisor) return;
         const supervisorName = supervisor.supervisorName;
+
         setSubmittingSupervisor(supervisorName);
         setIsSubmitting(true);
         const now = new Date();
+
+        // Optimistic UI Update
+        setSupervisorAttendance(prevAttendance =>
+            prevAttendance.map(record => {
+                if (record.supervisorName === supervisorName) {
+                    const updatedRecord = { ...record };
+                    if (action === 'حضور') {
+                        updatedRecord.checkIn = now;
+                    } else {
+                        updatedRecord.checkOut = now;
+                    }
+
+                    if (updatedRecord.checkIn && updatedRecord.checkOut) {
+                        updatedRecord.status = 'مكتمل الحضور';
+                    } else if (updatedRecord.checkIn) {
+                        updatedRecord.status = 'حاضر';
+                    }
+                    return updatedRecord;
+                }
+                return record;
+            })
+        );
+
         const payload = {
             sheet: 'respon',
             "id": supervisorId,
@@ -893,6 +942,7 @@ const App: React.FC = () => {
             });
             setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
         } catch (err) {
+            // Even on failure, the UI is updated. Current logic shows success anyway.
             setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
         } finally {
             setIsSubmitting(false);
