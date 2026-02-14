@@ -318,6 +318,24 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
     return report.sort((a, b) => b.date.localeCompare(a.date));
 };
 
+/**
+ * دالة مساعدة لتحويل التاريخ والوقت من الشيت إلى كائن Date
+ */
+const parseAttendanceTime = (dateStr: string, timeStr: string): Date | null => {
+    try {
+        // التاريخ غالباً بتنسيق YYYY-MM-DD
+        // الوقت غالباً بتنسيق HH:mm:ss
+        const datePart = dateStr.split(' ')[0];
+        const timePart = timeStr.split(' ').pop() || '';
+        if (!datePart || !timePart) return null;
+        
+        const d = new Date(`${datePart}T${timePart}`);
+        return isNaN(d.getTime()) ? null : d;
+    } catch (e) {
+        return null;
+    }
+};
+
 const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeachers: TeacherInfo[]): TeacherDailyAttendance[] => {
     const timeZone = 'Asia/Riyadh';
     const todayRiyadhStr = new Date().toLocaleDateString('en-CA', { timeZone });
@@ -332,11 +350,18 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
         if (isNaN(id) || !teacherRecords.has(id)) return;
 
         const dateStr = String(item['تاريخ العملية'] || '');
+        const timeStr = String(item['وقت العملية'] || '');
+        
         if (dateStr.includes(todayRiyadhStr)) {
             const record = teacherRecords.get(id)!;
             const status = (item.status || '').trim();
-            if (status === 'حضور' || status === 'الحضور') record.checkIn = new Date(); 
-            else if (status === 'انصراف') record.checkOut = new Date();
+            const actualTime = parseAttendanceTime(dateStr, timeStr);
+            
+            if (status === 'حضور' || status === 'الحضور') {
+                record.checkIn = actualTime;
+            } else if (status === 'انصراف') {
+                record.checkOut = actualTime;
+            }
         }
     });
 
@@ -362,11 +387,18 @@ const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], al
         if (!supervisorId || !supervisorRecords.has(supervisorId)) return;
         
         const dateStr = String(item['تاريخ العملية'] || '');
+        const timeStr = String(item['وقت العملية'] || '');
+
         if (dateStr.includes(todayRiyadhStr)) {
             const record = supervisorRecords.get(supervisorId)!;
             const status = (item.status || '').trim();
-            if (status === 'حضور' || status === 'الحضور') record.checkIn = new Date();
-            else if (status === 'انصراف') record.checkOut = new Date();
+            const actualTime = parseAttendanceTime(dateStr, timeStr);
+
+            if (status === 'حضور' || status === 'الحضور') {
+                record.checkIn = actualTime;
+            } else if (status === 'انصراف') {
+                record.checkOut = actualTime;
+            }
         }
     });
 
@@ -1136,6 +1168,7 @@ const App: React.FC = () => {
             case 'dailyCircles':
                 return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
             case 'exam':
+                // FIX: Corrected typo handlePostPostExam to handlePostExam
                 return authenticatedUser && <ExamPage onSubmit={handlePostExam} isSubmitting={isSubmitting} students={registeredStudents} authenticatedUser={authenticatedUser} />;
             case 'examReport':
                 return <ExamReportPage examData={examData} />;
