@@ -14,6 +14,9 @@ export interface RawStudentData {
   "نسبة الحضور": number;
   "اجمالي النقاط": number;
   "جوال ولي الأمر": string;
+  "نسبة إنجاز خطة الحفظ"?: string | number;
+  "نسبة إنجاز خطة التثبيت"?: string | number;
+  "نسبة إنجاز خطة المراجعة"?: string | number;
   "الأسبوع"?: string;
   "الاسبوع"?: string;
   "اليوم"?: string;
@@ -53,10 +56,13 @@ export interface CircleReportData {
   supervisorName: string;
   studentCount: number;
   totalMemorizationAchieved: number;
+  totalMemorizationRequired: number;
   avgMemorizationIndex: number;
   totalReviewAchieved: number;
+  totalReviewRequired: number;
   avgReviewIndex: number;
   totalConsolidationAchieved: number;
+  totalConsolidationRequired: number;
   avgConsolidationIndex: number;
   avgGeneralIndex: number;
   avgAttendance: number;

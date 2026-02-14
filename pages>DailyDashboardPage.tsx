@@ -15,7 +15,7 @@ interface DailyCircleCardProps {
 const StatItem: React.FC<{ label: string; achieved: number; required: number; indexValue: number; indexLabel: string; }> = ({ label, achieved, required, indexValue, indexLabel }) => (
     <div className="py-3">
         <div className="flex justify-between items-center text-sm mb-1">
-            <span className="text-stone-600">{label}</span>
+            <span className="text-stone-600 font-medium">{label}</span>
             <span className="font-bold text-stone-800">{achieved.toFixed(2)} / {required.toFixed(2)}</span>
         </div>
         <ProgressBar value={indexValue} />
@@ -30,32 +30,34 @@ const DailyCircleCard: React.FC<DailyCircleCardProps> = ({ circle, onSelect, onE
         className="bg-white rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden flex flex-col border border-stone-200"
     >
         <div 
-            className="p-5 border-b-2 border-amber-400 cursor-pointer hover:bg-amber-50"
+            className="p-5 border-b-2 border-amber-400 cursor-pointer hover:bg-amber-50 bg-stone-50/30"
             onClick={() => onSelect(circle.circleName)}
         >
             <h3 className="text-lg font-bold text-stone-800 truncate">{circle.circleName}</h3>
             <p className="text-sm text-stone-600">{circle.studentCount} طالب</p>
         </div>
-        <div className="p-5 divide-y divide-stone-200 flex-grow bg-stone-50/50">
-            <StatItem label="مجموع أوجه الحفظ" achieved={circle.totalMemorizationAchieved} required={circle.totalMemorizationRequired} indexValue={circle.avgMemorizationIndex} indexLabel="مؤشر الحفظ" />
-            <StatItem label="مجموع أوجه المراجعة" achieved={circle.totalReviewAchieved} required={circle.totalReviewRequired} indexValue={circle.avgReviewIndex} indexLabel="مؤشر المراجعة" />
-            <StatItem label="مجموع أوجه التثبيت" achieved={circle.totalConsolidationAchieved} required={circle.totalConsolidationRequired} indexValue={circle.avgConsolidationIndex} indexLabel="مؤشر التثبيت" />
+        <div className="p-5 divide-y divide-stone-200 flex-grow bg-white">
+            <StatItem label="أوجه الحفظ" achieved={circle.totalMemorizationAchieved} required={circle.totalMemorizationRequired} indexValue={circle.avgMemorizationIndex} indexLabel="مؤشر الحفظ" />
+            <StatItem label="أوجه المراجعة" achieved={circle.totalReviewAchieved} required={circle.totalReviewRequired} indexValue={circle.avgReviewIndex} indexLabel="مؤشر المراجعة" />
+            <StatItem label="أوجه التثبيت" achieved={circle.totalConsolidationAchieved} required={circle.totalConsolidationRequired} indexValue={circle.avgConsolidationIndex} indexLabel="مؤشر التثبيت" />
+            
             <div className="py-3">
                  <div className="flex justify-between items-center text-sm mb-1">
-                    <span className="text-stone-600 font-bold">المؤشر العام</span>
-                    <span className="font-bold text-stone-800">{(circle.avgGeneralIndex * 100).toFixed(2)}%</span>
+                    <span className="text-stone-600 font-bold">المؤشر العام اليومي</span>
+                    <span className="font-bold text-amber-600">{(circle.avgGeneralIndex * 100).toFixed(2)}%</span>
                 </div>
                 <ProgressBar value={circle.avgGeneralIndex} />
             </div>
+
             <div className="pt-3">
                  <div className="flex justify-between items-center text-sm mb-1">
-                    <span className="text-stone-600">متوسط نسبة الحضور</span>
-                    <span className="font-bold text-stone-800">{(circle.avgAttendance * 100).toFixed(0)}%</span>
+                    <span className="text-stone-600">نسبة الحضور</span>
+                    <span className="font-bold text-stone-800">{(circle.avgAttendance * 100).toFixed(2)}%</span>
                 </div>
                 <ProgressBar value={circle.avgAttendance} />
             </div>
         </div>
-         <div className="p-3 bg-stone-100 border-t border-stone-200">
+         <div className="p-3 bg-stone-50 border-t border-stone-200">
             <button
                 onClick={(e) => {
                     e.stopPropagation(); // Prevent card click

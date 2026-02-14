@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { ProcessedStudentData } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -48,21 +49,24 @@ const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClos
             <DetailRow label="دروس الحفظ">{student.memorizationLessons}</DetailRow>
             <DetailRow label="أوجه الحفظ">{student.memorizationPages.formatted}</DetailRow>
             <DetailRow label="مؤشر إنجاز الحفظ">
-                <div className="w-40">
+                <div className="w-40 flex flex-col items-center">
                     <ProgressBar value={student.memorizationPages.index} />
+                    <span className="text-xs font-bold text-stone-500 mt-1">{(student.memorizationPages.index * 100).toFixed(2)}%</span>
                 </div>
             </DetailRow>
              <DetailRow label="دروس المراجعة">{student.reviewLessons}</DetailRow>
             <DetailRow label="أوجه المراجعة">{student.reviewPages.formatted}</DetailRow>
             <DetailRow label="مؤشر إنجاز المراجعة">
-                <div className="w-40">
+                <div className="w-40 flex flex-col items-center">
                     <ProgressBar value={student.reviewPages.index} />
+                    <span className="text-xs font-bold text-stone-500 mt-1">{(student.reviewPages.index * 100).toFixed(2)}%</span>
                 </div>
             </DetailRow>
             <DetailRow label="أوجه التثبيت">{student.consolidationPages.formatted}</DetailRow>
             <DetailRow label="مؤشر إنجاز التثبيت">
-                <div className="w-40">
+                <div className="w-40 flex flex-col items-center">
                     <ProgressBar value={student.consolidationPages.index} />
+                    <span className="text-xs font-bold text-stone-500 mt-1">{(student.consolidationPages.index * 100).toFixed(2)}%</span>
                 </div>
             </DetailRow>
             <DetailRow label="نسبة الحضور">

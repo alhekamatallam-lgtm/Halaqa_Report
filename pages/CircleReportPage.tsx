@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import type { ProcessedStudentData, CircleReportData, SupervisorData } from '../types';
 import CircleFilterControls from '../components/CircleFilterControls';
@@ -103,12 +104,15 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
       const studentCount = circleStudents.length;
       
       const totalMemorizationAchieved = circleStudents.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
+      const totalMemorizationRequired = circleStudents.reduce((sum, s) => sum + s.memorizationPages.required, 0);
       let avgMemorizationIndex = circleStudents.reduce((sum, s) => sum + s.memorizationPages.index, 0) / studentCount;
       
       const totalReviewAchieved = circleStudents.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
+      const totalReviewRequired = circleStudents.reduce((sum, s) => sum + s.reviewPages.required, 0);
       let avgReviewIndex = circleStudents.reduce((sum, s) => sum + s.reviewPages.index, 0) / studentCount;
       
       const totalConsolidationAchieved = circleStudents.reduce((sum, s) => sum + s.consolidationPages.achieved, 0);
+      const totalConsolidationRequired = circleStudents.reduce((sum, s) => sum + s.consolidationPages.required, 0);
       let avgConsolidationIndex = circleStudents.reduce((sum, s) => sum + s.consolidationPages.index, 0) / studentCount;
 
       const avgAttendance = circleStudents.reduce((sum, s) => sum + s.attendance, 0) / studentCount;
@@ -128,10 +132,13 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
         supervisorName: supervisorMap.get(circleName) || 'غير محدد',
         studentCount,
         totalMemorizationAchieved,
+        totalMemorizationRequired,
         avgMemorizationIndex,
         totalReviewAchieved,
+        totalReviewRequired,
         avgReviewIndex,
         totalConsolidationAchieved,
+        totalConsolidationRequired,
         avgConsolidationIndex,
         avgGeneralIndex,
         avgAttendance,
@@ -180,14 +187,13 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
                 <div class="print-progress-container">
                     <div class="print-progress-bar" style="width: ${barPercentage.toFixed(0)}%;"></div>
                 </div>
-                <div class="print-progress-percentage">${actualPercentage.toFixed(0)}%</div>
+                <div class="print-progress-percentage">${actualPercentage.toFixed(2)}%</div>
             `;
         };
 
-        const getSummaryAchievementCellHtml = (achieved: number, required: number) => {
-            const index = required > 0 ? achieved / required : 0;
+        const getAchievementCellHtml = (achieved: number, required: number, index: number) => {
             return `
-                <div class="print-achievement-text">${achieved.toFixed(1)} / ${required.toFixed(1)}</div>
+                <div class="print-achievement-text">${achieved.toFixed(2)} / ${required.toFixed(2)}</div>
                 ${getProgressBarHtml(index)}
             `;
         };
@@ -223,18 +229,9 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
                                 <td>${circle.circleName}</td>
                                 <td>${circle.teacherName}</td>
                                 <td>${circle.supervisorName}</td>
-                                <td>
-                                    <div class="print-achievement-text">${circle.totalMemorizationAchieved.toFixed(1)}</div>
-                                    ${getProgressBarHtml(circle.avgMemorizationIndex)}
-                                </td>
-                                <td>
-                                    <div class="print-achievement-text">${circle.totalReviewAchieved.toFixed(1)}</div>
-                                    ${getProgressBarHtml(circle.avgReviewIndex)}
-                                </td>
-                                <td>
-                                    <div class="print-achievement-text">${circle.totalConsolidationAchieved.toFixed(1)}</div>
-                                    ${getProgressBarHtml(circle.avgConsolidationIndex)}
-                                </td>
+                                <td>${getAchievementCellHtml(circle.totalMemorizationAchieved, circle.totalMemorizationRequired, circle.avgMemorizationIndex)}</td>
+                                <td>${getAchievementCellHtml(circle.totalReviewAchieved, circle.totalReviewRequired, circle.avgReviewIndex)}</td>
+                                <td>${getAchievementCellHtml(circle.totalConsolidationAchieved, circle.totalConsolidationRequired, circle.avgConsolidationIndex)}</td>
                                 <td>${getProgressBarHtml(circle.avgAttendance)}</td>
                                 <td>${circle.totalPoints}</td>
                             </tr>
@@ -245,9 +242,9 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
                             <td><strong>الإجمالي</strong></td>
                             <td></td>
                             <td></td>
-                            <td>${getSummaryAchievementCellHtml(summary.totalMemorizationAchieved, summary.totalMemorizationRequired)}</td>
-                            <td>${getSummaryAchievementCellHtml(summary.totalReviewAchieved, summary.totalReviewRequired)}</td>
-                            <td>${getSummaryAchievementCellHtml(summary.totalConsolidationAchieved, summary.totalConsolidationRequired)}</td>
+                            <td>${getAchievementCellHtml(summary.totalMemorizationAchieved, summary.totalMemorizationRequired, summary.totalMemorizationRequired > 0 ? summary.totalMemorizationAchieved/summary.totalMemorizationRequired : 0)}</td>
+                            <td>${getAchievementCellHtml(summary.totalReviewAchieved, summary.totalReviewRequired, summary.totalReviewRequired > 0 ? summary.totalReviewAchieved/summary.totalReviewRequired : 0)}</td>
+                            <td>${getAchievementCellHtml(summary.totalConsolidationAchieved, summary.totalConsolidationRequired, summary.totalConsolidationRequired > 0 ? summary.totalConsolidationAchieved/summary.totalConsolidationRequired : 0)}</td>
                             <td>${getProgressBarHtml(summary.avgAttendance)}</td>
                             <td><strong>${summary.totalPoints.toFixed(0)}</strong></td>
                         </tr>
@@ -274,20 +271,22 @@ const CircleReportPage: React.FC<CircleReportPageProps> = ({ students, superviso
     };
 
     const handleExport = () => {
-        // FIX: Replaced `declare` with a constant assigned from the window object to fix scoping issue.
         const XLSX = (window as any).XLSX;
         const dataToExport = fullCircleList.map(circle => ({
           'الحلقة': circle.circleName,
           'المعلم': circle.teacherName,
           'المشرف التعليمي': circle.supervisorName,
           'عدد الطلاب': circle.studentCount,
-          'مجموع أوجه الحفظ': circle.totalMemorizationAchieved.toFixed(1),
-          'مؤشر الحفظ': `${(circle.avgMemorizationIndex * 100).toFixed(0)}%`,
-          'مجموع أوجه المراجعة': circle.totalReviewAchieved.toFixed(1),
-          'مؤشر المراجعة': `${(circle.avgReviewIndex * 100).toFixed(0)}%`,
-          'مجموع أوجه التثبيت': circle.totalConsolidationAchieved.toFixed(1),
-          'مؤشر التثبيت': `${(circle.avgConsolidationIndex * 100).toFixed(0)}%`,
-          'المؤشر العام': `${(circle.avgGeneralIndex * 100).toFixed(0)}%`,
+          'أوجه الحفظ المنجزة': circle.totalMemorizationAchieved.toFixed(2),
+          'أوجه الحفظ المطلوبة': circle.totalMemorizationRequired.toFixed(2),
+          'مؤشر الحفظ': `${(circle.avgMemorizationIndex * 100).toFixed(2)}%`,
+          'أوجه المراجعة المنجزة': circle.totalReviewAchieved.toFixed(2),
+          'أوجه المراجعة المطلوبة': circle.totalReviewRequired.toFixed(2),
+          'مؤشر المراجعة': `${(circle.avgReviewIndex * 100).toFixed(2)}%`,
+          'أوجه التثبيت المنجزة': circle.totalConsolidationAchieved.toFixed(2),
+          'أوجه التثبيت المطلوبة': circle.totalConsolidationRequired.toFixed(2),
+          'مؤشر التثبيت': `${(circle.avgConsolidationIndex * 100).toFixed(2)}%`,
+          'المؤشر العام': `${(circle.avgGeneralIndex * 100).toFixed(2)}%`,
           'متوسط الحضور': `${(circle.avgAttendance * 100).toFixed(0)}%`,
           'إجمالي النقاط': circle.totalPoints,
         }));

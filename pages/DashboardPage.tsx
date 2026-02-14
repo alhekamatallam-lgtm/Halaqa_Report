@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import type { ProcessedStudentData, CircleReportData, SupervisorData } from '../types';
 import { ProgressBar } from '../components/ProgressBar';
@@ -9,15 +10,15 @@ interface CircleCardProps {
     onSelect: (circleName: string) => void;
 }
 
-const StatItem: React.FC<{ label: string; value?: string | number; indexValue: number; indexLabel: string; }> = ({ label, value, indexValue, indexLabel }) => (
+const StatItem: React.FC<{ label: string; achieved: number; required: number; indexValue: number; indexLabel: string; }> = ({ label, achieved, required, indexValue, indexLabel }) => (
     <div className="py-3">
         <div className="flex justify-between items-center text-sm mb-1">
-            <span className="text-stone-600">{label}</span>
-            {value != null && <span className="font-bold text-stone-800">{value}</span>}
+            <span className="text-stone-600 font-medium">{label}</span>
+            <span className="font-bold text-stone-800">{achieved.toFixed(2)} / {required.toFixed(2)}</span>
         </div>
         <ProgressBar value={indexValue} />
-        <p className="text-xs text-right text-stone-500 mt-1">
-            {indexLabel}: {(indexValue * 100).toFixed(0)}%
+        <p className="text-xs text-right text-stone-500 mt-1 font-bold">
+            {indexLabel}: {(indexValue * 100).toFixed(2)}%
         </p>
     </div>
 );
@@ -27,19 +28,27 @@ const CircleCard: React.FC<CircleCardProps> = ({ circle, onSelect }) => (
         className="bg-white rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden cursor-pointer flex flex-col border border-stone-200"
         onClick={() => onSelect(circle.circleName)}
     >
-        <div className="p-5 border-b-2 border-amber-400">
+        <div className="p-5 border-b-2 border-amber-400 bg-stone-50/30">
             <h3 className="text-lg font-bold text-stone-800 truncate">{circle.circleName}</h3>
             <p className="text-sm text-stone-600">{circle.studentCount} طالب</p>
         </div>
-        <div className="p-5 divide-y divide-stone-200 flex-grow bg-stone-50/50">
-            <StatItem label="مجموع أوجه الحفظ" value={circle.totalMemorizationAchieved.toFixed(1)} indexValue={circle.avgMemorizationIndex} indexLabel="مؤشر الحفظ" />
-            <StatItem label="مجموع أوجه المراجعة" value={circle.totalReviewAchieved.toFixed(1)} indexValue={circle.avgReviewIndex} indexLabel="مؤشر المراجعة" />
-            <StatItem label="مجموع أوجه التثبيت" value={circle.totalConsolidationAchieved.toFixed(1)} indexValue={circle.avgConsolidationIndex} indexLabel="مؤشر التثبيت" />
-            <StatItem label="المؤشر العام" indexValue={circle.avgGeneralIndex} indexLabel="المؤشر العام" />
+        <div className="p-5 divide-y divide-stone-200 flex-grow bg-white">
+            <StatItem label="مجموع أوجه الحفظ" achieved={circle.totalMemorizationAchieved} required={circle.totalMemorizationRequired} indexValue={circle.avgMemorizationIndex} indexLabel="مؤشر الحفظ" />
+            <StatItem label="مجموع أوجه المراجعة" achieved={circle.totalReviewAchieved} required={circle.totalReviewRequired} indexValue={circle.avgReviewIndex} indexLabel="مؤشر المراجعة" />
+            <StatItem label="مجموع أوجه التثبيت" achieved={circle.totalConsolidationAchieved} required={circle.totalConsolidationRequired} indexValue={circle.avgConsolidationIndex} indexLabel="مؤشر التثبيت" />
+            
+            <div className="py-3">
+                 <div className="flex justify-between items-center text-sm mb-1">
+                    <span className="text-stone-600 font-bold">المؤشر العام للحلقة</span>
+                    <span className="font-bold text-amber-600">{(circle.avgGeneralIndex * 100).toFixed(2)}%</span>
+                </div>
+                <ProgressBar value={circle.avgGeneralIndex} />
+            </div>
+
             <div className="pt-3">
                  <div className="flex justify-between items-center text-sm mb-1">
                     <span className="text-stone-600">متوسط نسبة الحضور</span>
-                    <span className="font-bold text-stone-800">{(circle.avgAttendance * 100).toFixed(0)}%</span>
+                    <span className="font-bold text-stone-800">{(circle.avgAttendance * 100).toFixed(2)}%</span>
                 </div>
                 <ProgressBar value={circle.avgAttendance} />
             </div>
@@ -91,12 +100,15 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect,
       const studentCount = circleStudents.length;
       
       const totalMemorizationAchieved = circleStudents.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
+      const totalMemorizationRequired = circleStudents.reduce((sum, s) => sum + s.memorizationPages.required, 0);
       let avgMemorizationIndex = studentCount > 0 ? circleStudents.reduce((sum, s) => sum + s.memorizationPages.index, 0) / studentCount : 0;
       
       const totalReviewAchieved = circleStudents.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
+      const totalReviewRequired = circleStudents.reduce((sum, s) => sum + s.reviewPages.required, 0);
       let avgReviewIndex = studentCount > 0 ? circleStudents.reduce((sum, s) => sum + s.reviewPages.index, 0) / studentCount : 0;
       
       const totalConsolidationAchieved = circleStudents.reduce((sum, s) => sum + s.consolidationPages.achieved, 0);
+      const totalConsolidationRequired = circleStudents.reduce((sum, s) => sum + s.consolidationPages.required, 0);
       let avgConsolidationIndex = studentCount > 0 ? circleStudents.reduce((sum, s) => sum + s.consolidationPages.index, 0) / studentCount : 0;
 
       const avgAttendance = studentCount > 0 ? circleStudents.reduce((sum, s) => sum + s.attendance, 0) / studentCount : 0;
@@ -116,10 +128,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect,
         supervisorName: supervisorMap.get(circleName) || 'غير محدد',
         studentCount,
         totalMemorizationAchieved,
+        totalMemorizationRequired,
         avgMemorizationIndex,
         totalReviewAchieved,
+        totalReviewRequired,
         avgReviewIndex,
         totalConsolidationAchieved,
+        totalConsolidationRequired,
         avgConsolidationIndex,
         avgGeneralIndex,
         avgAttendance,
@@ -129,7 +144,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect,
     return report.sort((a,b) => a.circleName.localeCompare(b.circleName, 'ar'));
   }, [studentsForWeek, supervisors]);
 
-  // Memoized, interconnected lists for filters, following a strict hierarchy.
   const weekOptions = useMemo(() => {
     const weeks = new Set<string>(students.map(s => s.week).filter((w): w is string => !!w));
     return Array.from(weeks).sort((a,b) => a.localeCompare(b, 'ar'));
@@ -160,7 +174,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ students, onCircleSelect,
       return Array.from(circles).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [studentsForWeek, selectedCircleTime, selectedTeacher]);
 
-  // Effects to reset selections if they become invalid (safety net)
   useEffect(() => {
       if (selectedTeacher && !teacherOptions.includes(selectedTeacher)) {
           setSelectedTeacher('');

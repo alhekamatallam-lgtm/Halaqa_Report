@@ -99,55 +99,67 @@ const normalizeArabicForMatch = (text: string) => {
         .trim();
 };
 
-const parseAchievement = (value: any): Achievement => {
+const parsePercentage = (value: any): number => {
+    if (value === undefined || value === null || value === '') return 0;
+    let strValue = String(value).trim();
+    if (strValue.endsWith('%')) {
+        return (parseFloat(strValue.replace('%', '')) || 0) / 100;
+    }
+    const numValue = parseFloat(strValue);
+    if (isNaN(numValue)) return 0;
+    return numValue > 1 ? numValue / 100 : numValue;
+};
+
+/**
+ * دالة محسنة لمعالجة بيانات الإنجاز بدقة رقمين عشريين (0.00)
+ */
+const parseAchievement = (value: any, directPercentage?: any): Achievement => {
   const strValue = String(value || '').trim();
-  if (!strValue) {
-    return { achieved: 0, required: 0, formatted: '0 / 0', index: 0 };
+  const directIndex = directPercentage ? parsePercentage(directPercentage) : 0;
+  
+  if (directPercentage != null && directPercentage !== '') {
+      let achieved = parseFloat(strValue);
+      if (isNaN(achieved) || strValue.includes(':') || achieved > 500) achieved = 0; 
+
+      const required = directIndex > 0 ? achieved / directIndex : 0;
+
+      // التنسيق برقمين عشريين
+      const formatted = required > 0 
+        ? `${achieved.toFixed(2)} / ${required.toFixed(2)}` 
+        : `${achieved.toFixed(2)}`;
+
+      return {
+          achieved,
+          required,
+          formatted,
+          index: directIndex
+      };
   }
 
-  // إذا كانت البيانات تحتوي على % للفصل بين المنجز والمطلوب
+  if (!strValue) {
+    return { achieved: 0, required: 0, formatted: '0.00', index: 0 };
+  }
+
   if (strValue.includes('%')) {
     const parts = strValue.split('%');
     const achieved = parseFloat(parts[0]) || 0;
     const required = parseFloat(parts[1]) || 0;
+    const index = required > 0 ? achieved / required : 0;
     return {
       achieved,
       required,
-      formatted: `${achieved} / ${required}`,
-      index: required > 0 ? achieved / required : 0,
+      formatted: `${achieved.toFixed(2)} / ${required.toFixed(2)}`,
+      index,
     };
   } else {
-    // إذا كانت البيانات رقماً مباشراً (مثل 1.7)
     const achieved = parseFloat(strValue) || 0;
     return {
       achieved,
-      required: 0, // لا يوجد مطلوب محدد في هذا التنسيق
-      formatted: `${achieved}`,
-      index: 0, // المؤشر صفر لعدم وجود قيمة "مطلوب" للمقارنة
+      required: 0,
+      formatted: `${achieved.toFixed(2)}`,
+      index: 0,
     };
   }
-};
-
-/**
- * Strict parser for "Attendance Percentage" (نسبة الحضور) column.
- * Converts "100%", "85", "0.85" all to 0.0 - 1.0 range.
- */
-const parsePercentage = (value: any): number => {
-    if (value === undefined || value === null || value === '') return 0;
-    
-    let strValue = String(value).trim();
-    
-    // Handle "%" symbol
-    if (strValue.endsWith('%')) {
-        return (parseFloat(strValue.replace('%', '')) || 0) / 100;
-    }
-    
-    const numValue = parseFloat(strValue);
-    if (isNaN(numValue)) return 0;
-
-    // Logic: Values > 1 (e.g., 90) are treated as percentages (90/100 = 0.9).
-    // Values <= 1 (e.g., 0.9) are treated as fractions already.
-    return numValue > 1 ? numValue / 100 : numValue;
 };
 
 const processEvalResultsData = (
@@ -421,6 +433,9 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
         data: ProcessedStudentData;
         attendanceSum: number;
         recordCount: number;
+        memIndexSum: number;
+        revIndexSum: number;
+        conIndexSum: number;
     }>();
     let lastKey: string | null = null;
 
@@ -444,9 +459,10 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
         if (!currentKey) continue;
 
         const attendance = parsePercentage(item["نسبة الحضور"]);
-        const memPages = parseAchievement(item["أوجه الحفظ"]);
-        const revPages = parseAchievement(item["أوجه المراجه"]);
-        const conPages = parseAchievement(item["أوجه التثبيت"]);
+        const memPages = parseAchievement(item["أوجه الحفظ"], item["نسبة إنجاز خطة الحفظ"]);
+        const revPages = parseAchievement(item["أوجه المراجه"], item["نسبة إنجاز خطة المراجعة"]);
+        const conPages = parseAchievement(item["أوجه التثبيت"], item["نسبة إنجاز خطة التثبيت"]);
+        
         const points = Number(item["اجمالي النقاط"]) || 0;
         const memLessons = normalize(item["دروس الحفظ"]);
         const revLessons = normalize(item["دروس المراجعة"]);
@@ -462,8 +478,10 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
             existingStudent.consolidationPages.required += conPages.required;
             existingStudent.totalPoints += points;
             
-            // Collect for precise attendance average from column
             entry.attendanceSum += attendance;
+            entry.memIndexSum += memPages.index;
+            entry.revIndexSum += revPages.index;
+            entry.conIndexSum += conPages.index;
             entry.recordCount += 1;
 
             if (memLessons) existingStudent.memorizationLessons = existingStudent.memorizationLessons ? `${existingStudent.memorizationLessons}, ${memLessons}` : memLessons;
@@ -472,9 +490,9 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
             if (!studentName || username == null || !week) continue;
             const circle = normalize(item["الحلقة"]);
             const isTabyan = circle.includes('التبيان');
-            const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
-            const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
-            const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
+            const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '100%', index: 1 } : memPages;
+            const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '100%', index: 1 } : revPages;
+            const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '100%', index: 1 } : conPages;
 
             const newStudent: ProcessedStudentData = {
                 id: currentKey,
@@ -494,26 +512,39 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
                 guardianMobile: normalize(item["جوال ولي الأمر"]),
                 week: week,
             };
-            studentWeekMap.set(currentKey, { data: newStudent, attendanceSum: attendance, recordCount: 1 });
+            studentWeekMap.set(currentKey, { 
+                data: newStudent, 
+                attendanceSum: attendance, 
+                memIndexSum: memPages.index,
+                revIndexSum: revPages.index,
+                conIndexSum: conPages.index,
+                recordCount: 1 
+            });
         }
     }
     
     return Array.from(studentWeekMap.values()).map(entry => {
         const student = entry.data;
-        // Final precise attendance average from multiple entries in the same week
-        student.attendance = entry.attendanceSum / entry.recordCount;
+        const count = entry.recordCount;
+        student.attendance = entry.attendanceSum / count;
         
-        // تحسين عرض النص: إذا لم يكن هناك "مطلوب" (0)، نعرض المنجز فقط
-        const formatStr = (ach: number, req: number) => req > 0 ? `${ach.toFixed(1)} / ${req.toFixed(1)}` : `${ach.toFixed(1)}`;
+        // إعادة بناء نصوص الإنجاز المجمعة بدقة رقمين عشريين
+        const updateFormatted = (ach: number, req: number) => {
+            return req > 0 ? `${ach.toFixed(2)} / ${req.toFixed(2)}` : `${ach.toFixed(2)}`;
+        };
+
+        const avgMemIdx = entry.memIndexSum / count;
+        const avgRevIdx = entry.revIndexSum / count;
+        const avgConIdx = entry.conIndexSum / count;
+
+        student.memorizationPages.index = avgMemIdx;
+        student.memorizationPages.formatted = updateFormatted(student.memorizationPages.achieved, student.memorizationPages.required);
         
-        student.memorizationPages.formatted = formatStr(student.memorizationPages.achieved, student.memorizationPages.required);
-        student.memorizationPages.index = student.memorizationPages.required > 0 ? student.memorizationPages.achieved / student.memorizationPages.required : 0;
-        
-        student.reviewPages.formatted = formatStr(student.reviewPages.achieved, student.reviewPages.required);
-        student.reviewPages.index = student.reviewPages.required > 0 ? student.reviewPages.achieved / student.reviewPages.required : 0;
-        
-        student.consolidationPages.formatted = formatStr(student.consolidationPages.achieved, student.consolidationPages.required);
-        student.consolidationPages.index = student.consolidationPages.required > 0 ? student.consolidationPages.achieved / student.consolidationPages.required : 0;
+        student.reviewPages.index = avgRevIdx;
+        student.reviewPages.formatted = updateFormatted(student.reviewPages.achieved, student.reviewPages.required);
+
+        student.consolidationPages.index = avgConIdx;
+        student.consolidationPages.formatted = updateFormatted(student.consolidationPages.achieved, student.consolidationPages.required);
         
         return student;
     });
@@ -529,21 +560,14 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
         const username = Number(usernameRaw);
         const circle = normalize(item["الحلقة"]);
         const isTabyan = circle.includes('التبيان');
-        const memPages = parseAchievement(item["أوجه الحفظ"]);
-        const revPages = parseAchievement(item["أوجه المراجه"]);
-        const conPages = parseAchievement(item["أوجه التثبيت"]);
-        const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
-        const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
-        const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
-        
-        const formatStr = (ach: number, req: number) => req > 0 ? `${ach.toFixed(1)} / ${req.toFixed(1)}` : `${ach.toFixed(1)}`;
 
-        finalMemPages.formatted = formatStr(finalMemPages.achieved, finalMemPages.required);
-        finalMemPages.index = finalMemPages.required > 0 ? finalMemPages.achieved / finalMemPages.required : 0;
-        finalRevPages.formatted = formatStr(finalRevPages.achieved, finalRevPages.required);
-        finalRevPages.index = finalRevPages.required > 0 ? finalRevPages.achieved / finalRevPages.required : 0;
-        finalConPages.formatted = formatStr(finalConPages.achieved, finalConPages.required);
-        finalConPages.index = finalConPages.required > 0 ? finalConPages.achieved / finalConPages.required : 0;
+        const memPages = parseAchievement(item["أوجه الحفظ"], item["نسبة إنجاز خطة الحفظ"]);
+        const revPages = parseAchievement(item["أوجه المراجه"], item["نسبة إنجاز خطة المراجعة"]);
+        const conPages = parseAchievement(item["أوجه التثبيت"], item["نسبة إنجاز خطة التثبيت"]);
+
+        const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '100%', index: 1 } : memPages;
+        const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '100%', index: 1 } : revPages;
+        const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '100%', index: 1 } : conPages;
         
         const day = normalize(item["اليوم"]);
         return {
@@ -559,7 +583,7 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
             consolidationPages: finalConPages,
             teacherName: normalize(item["اسم المعلم"]),
             program: normalize(item["البرنامج"]),
-            attendance: parsePercentage(item["نسبة الحضور"]), // Direct from column
+            attendance: parsePercentage(item["نسبة الحضور"]),
             totalPoints: Number(item["اجمالي النقاط"]) || 0,
             guardianMobile: normalize(item["جوال ولي الأمر"]),
             day: day,
@@ -636,7 +660,6 @@ const App: React.FC = () => {
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
     const [settings, setSettings] = useState<ProcessedSettingsData>({});
     
-    // Loading State
     const [isLoading, setIsLoading] = useState(true);
     const [loadingMessage, setLoadingMessage] = useState("جاري التحميل...");
     const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
@@ -873,7 +896,6 @@ const App: React.FC = () => {
         setIsSubmitting(true);
         const now = new Date();
 
-        // Optimistic UI Update
         setTeacherAttendance(prevAttendance => 
             prevAttendance.map(record => {
                 if (record.teacherName === teacherName) {
@@ -911,7 +933,6 @@ const App: React.FC = () => {
             });
             setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
         } catch (err) {
-            // Even on failure, the UI is updated. Current logic shows success anyway.
             setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
         } finally {
             setIsSubmitting(false);
@@ -928,7 +949,6 @@ const App: React.FC = () => {
         setIsSubmitting(true);
         const now = new Date();
 
-        // Optimistic UI Update
         setSupervisorAttendance(prevAttendance =>
             prevAttendance.map(record => {
                 if (record.supervisorName === supervisorName) {
@@ -965,7 +985,6 @@ const App: React.FC = () => {
             });
             setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
         } catch (err) {
-            // Even on failure, the UI is updated. Current logic shows success anyway.
             setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
         } finally {
             setIsSubmitting(false);

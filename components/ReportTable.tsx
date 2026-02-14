@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import type { ProcessedStudentData } from '../types';
 import { ProgressBar } from './ProgressBar';
@@ -56,11 +55,11 @@ const SummaryAchievementCell: React.FC<{ achieved: number; required: number; }> 
     return (
         <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">
             <div className='flex flex-col gap-1 items-center'>
-                <span className="font-semibold">{`${achieved.toFixed(1)} / ${required.toFixed(1)}`}</span>
+                <span className="font-semibold">{achieved.toFixed(2)} / {required.toFixed(2)}</span>
                 <div className="w-full">
                     <ProgressBar value={index} />
-                    <p className="text-xs text-center text-gray-700 mt-1 font-bold">{(index * 100).toFixed(0)}%</p>
                 </div>
+                <span className="text-xs font-bold text-stone-500 mt-1">{(index * 100).toFixed(2)}%</span>
             </div>
         </td>
     );
@@ -98,30 +97,30 @@ export const ReportTable: React.FC<ReportTableProps> = ({ students, onRowClick, 
               <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{student.circle}</td>
               <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">{student.teacherName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">
-                <div className='flex flex-col gap-1'>
-                    <span>{student.memorizationPages.formatted}</span>
-                    <div>
+                <div className='flex flex-col gap-1 items-center'>
+                    <span className="font-semibold">{student.memorizationPages.formatted}</span>
+                    <div className="w-full">
                         <ProgressBar value={student.memorizationPages.index} />
-                        <p className="text-xs text-center text-gray-600 mt-1">{(student.memorizationPages.index * 100).toFixed(0)}%</p>
                     </div>
+                    <span className="text-xs font-bold text-stone-500 mt-1">{(student.memorizationPages.index * 100).toFixed(2)}%</span>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">
-                 <div className='flex flex-col gap-1'>
-                    <span>{student.reviewPages.formatted}</span>
-                    <div>
+                 <div className='flex flex-col gap-1 items-center'>
+                    <span className="font-semibold">{student.reviewPages.formatted}</span>
+                    <div className="w-full">
                         <ProgressBar value={student.reviewPages.index} />
-                        <p className="text-xs text-center text-gray-600 mt-1">{(student.reviewPages.index * 100).toFixed(0)}%</p>
                     </div>
+                    <span className="text-xs font-bold text-stone-500 mt-1">{(student.reviewPages.index * 100).toFixed(2)}%</span>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 min-w-[150px] text-center">
-                 <div className='flex flex-col gap-1'>
-                    <span>{student.consolidationPages.formatted}</span>
-                     <div>
+                 <div className='flex flex-col gap-1 items-center'>
+                    <span className="font-semibold">{student.consolidationPages.formatted}</span>
+                    <div className="w-full">
                         <ProgressBar value={student.consolidationPages.index} />
-                        <p className="text-xs text-center text-gray-600 mt-1">{(student.consolidationPages.index * 100).toFixed(0)}%</p>
                     </div>
+                    <span className="text-xs font-bold text-stone-500 mt-1">{(student.consolidationPages.index * 100).toFixed(2)}%</span>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600 text-center">

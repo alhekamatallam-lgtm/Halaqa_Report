@@ -45,7 +45,7 @@ const ExcellenceReportTable: React.FC<ExcellenceReportTableProps> = ({ circles }
                 <div className='flex flex-col gap-1 items-center'>
                   <div className="w-full">
                     <ProgressBar value={circle.avgMemorizationIndex} />
-                    <p className="text-xs text-center text-gray-600 mt-1">{(circle.avgMemorizationIndex * 100).toFixed(0)}%</p>
+                    <p className="text-xs text-center text-gray-600 mt-1 font-bold">{(circle.avgMemorizationIndex * 100).toFixed(2)}%</p>
                   </div>
                 </div>
               </td>
@@ -59,7 +59,7 @@ const ExcellenceReportTable: React.FC<ExcellenceReportTableProps> = ({ circles }
                 <div className='flex flex-col gap-1 items-center font-semibold'>
                   <div className="w-full">
                     <ProgressBar value={circle.excellenceScore} />
-                    <p className="text-xs text-center text-gray-700 mt-1">{(circle.excellenceScore * 100).toFixed(1)}%</p>
+                    <p className="text-xs text-center text-gray-700 mt-1 font-extrabold">{(circle.excellenceScore * 100).toFixed(2)}%</p>
                   </div>
                 </div>
               </td>

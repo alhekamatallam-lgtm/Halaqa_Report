@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import type { ProcessedStudentData, ExcellenceReportData, SupervisorData } from '../types';
 import ExcellenceReportTable from '../components/ExcellenceReportTable';
@@ -115,12 +116,18 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students, supervisors }
         const studentCount = circleStudents.length;
         
         const totalMemorizationAchieved = circleStudents.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
+        // Fix: Added calculation for missing properties in CircleReportData
+        const totalMemorizationRequired = circleStudents.reduce((sum, s) => sum + s.memorizationPages.required, 0);
         const avgMemorizationIndex = circleStudents.reduce((sum, s) => sum + s.memorizationPages.index, 0) / studentCount;
         
         const totalReviewAchieved = circleStudents.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
+        // Fix: Added calculation for missing properties in CircleReportData
+        const totalReviewRequired = circleStudents.reduce((sum, s) => sum + s.reviewPages.required, 0);
         const avgReviewIndex = circleStudents.reduce((sum, s) => sum + s.reviewPages.index, 0) / studentCount;
         
         const totalConsolidationAchieved = circleStudents.reduce((sum, s) => sum + s.consolidationPages.achieved, 0);
+        // Fix: Added calculation for missing properties in CircleReportData
+        const totalConsolidationRequired = circleStudents.reduce((sum, s) => sum + s.consolidationPages.required, 0);
         const avgConsolidationIndex = circleStudents.reduce((sum, s) => sum + s.consolidationPages.index, 0) / studentCount;
 
         const avgAttendance = circleStudents.reduce((sum, s) => sum + s.attendance, 0) / studentCount;
@@ -136,10 +143,14 @@ const ExcellencePage: React.FC<ExcellencePageProps> = ({ students, supervisors }
             supervisorName: supervisorMap.get(circleName) || 'غير محدد',
             studentCount,
             totalMemorizationAchieved,
+            // Fix: Passed missing required properties
+            totalMemorizationRequired,
             avgMemorizationIndex,
             totalReviewAchieved,
+            totalReviewRequired,
             avgReviewIndex,
             totalConsolidationAchieved,
+            totalConsolidationRequired,
             avgConsolidationIndex,
             avgGeneralIndex,
             avgAttendance,

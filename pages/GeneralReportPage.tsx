@@ -35,17 +35,18 @@ interface StatCardProps {
   value: string | number;
   description?: string;
   icon: React.ReactNode;
+  isMain?: boolean;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ label, value, description, icon }) => (
+const StatCard: React.FC<StatCardProps> = ({ label, value, description, icon, isMain }) => (
   <div
-    className="bg-white p-6 rounded-2xl shadow-xl flex items-center space-x-reverse space-x-6 transform hover:scale-105 transition-transform duration-300 border-t-4 border-amber-400"
+    className={`bg-white p-6 rounded-2xl shadow-xl flex items-center space-x-reverse space-x-6 transform hover:scale-105 transition-transform duration-300 border-t-4 ${isMain ? 'border-stone-800' : 'border-amber-400'}`}
   >
-    <div className="flex-shrink-0 bg-amber-100 text-amber-600 rounded-full p-4">
+    <div className={`flex-shrink-0 ${isMain ? 'bg-stone-800 text-amber-400' : 'bg-amber-100 text-amber-600'} rounded-full p-4`}>
       {icon}
     </div>
     <div>
-        <p className="text-2xl font-bold text-stone-800 tracking-tight">{value}</p>
+        <p className={`font-bold text-stone-800 tracking-tight ${isMain ? 'text-3xl' : 'text-2xl'}`}>{value}</p>
         <p className="text-base font-semibold text-stone-600 truncate">{label}</p>
         {description && <p className="text-xs text-stone-500 mt-1 font-medium">{description}</p>}
     </div>
@@ -64,23 +65,18 @@ const parseDateFromDayString = (dayString: string): Date => {
 const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStudents: ProcessedStudentData[], settings: ProcessedSettingsData }> = ({ students, dailyStudents, settings }) => {
 
   const { stats, targetDayLabel } = useMemo(() => {
-    // تحديد اليوم المستهدف للفلترة في بطاقة "عدد الطلاب" فقط
     const dayOptions = Array.from(new Set<string>(dailyStudents.map(s => s.day).filter((d): d is string => !!d)))
         .sort((a, b) => parseDateFromDayString(b).getTime() - parseDateFromDayString(a).getTime());
 
     const targetDay = settings.default_student_count_day || (dayOptions.length > 0 ? dayOptions[0] : null);
     
-    // فلترة عدد الطلاب لليوم المختار فقط
     const studentCountForTargetDay = targetDay 
         ? dailyStudents.filter(s => s.day === targetDay).length 
         : 0;
 
-    // --- المنطق: قراءة المتوسط مباشرة من الإعدادات المستلمة من ورقة Setting ---
     const rawAvg = parseFloat(settings.avg_attendance || '0');
-    // إذا كانت القيمة > 1 (مثل 82.88) نحولها لكسر 0.8288 لتعمل مع العمليات الحسابية
     const finalAvgAttendance = rawAvg > 1 ? rawAvg / 100 : rawAvg;
 
-    // حساب الإحصائيات العامة من ورقة التقارير (students)
     const totalCircles = new Set(students.map(s => s.circle)).size;
     const totalMemorization = students.reduce((sum, s) => sum + s.memorizationPages.achieved, 0);
     const totalReview = students.reduce((sum, s) => sum + s.reviewPages.achieved, 0);
@@ -115,25 +111,21 @@ const GeneralReportPage: React.FC<{ students: ProcessedStudentData[], dailyStude
       <StatCard 
         icon={<AttendanceIcon />} 
         label="متوسط الحضور العام" 
-        value={`${(stats.avgAttendance * 100).toFixed(1)}%`} 
-        // تم مسح الهنت بناءً على طلب المستخدم
+        value={`${(stats.avgAttendance * 100).toFixed(2)}%`} 
       />
       
-      <StatCard icon={<BookIcon />} label="إجمالي الحفظ" value={stats.totalMemorization.toFixed(1)} description="مجموع أوجه الحفظ لجميع الأسابيع" />
-      <StatCard icon={<BookIcon />} label="إجمالي المراجعة" value={stats.totalReview.toFixed(1)} description="مجموع أوجه المراجعة لجميع الأسابيع" />
-      <StatCard icon={<BookIcon />} label="إجمالي التثبيت" value={stats.totalConsolidation.toFixed(1)} description="مجموع أوجه التثبيت لجميع الأسابيع" />
+      <StatCard icon={<BookIcon />} label="إجمالي الحفظ" value={stats.totalMemorization.toFixed(2)} description="مجموع أوجه الحفظ" />
+      <StatCard icon={<BookIcon />} label="إجمالي المراجعة" value={stats.totalReview.toFixed(2)} description="مجموع أوجه المراجعة" />
+      <StatCard icon={<BookIcon />} label="إجمالي التثبيت" value={stats.totalConsolidation.toFixed(2)} description="مجموع أوجه التثبيت" />
       
       <div className="sm:col-span-2 lg:col-span-3">
-         <div className="bg-white p-6 rounded-2xl shadow-xl flex items-center space-x-reverse space-x-6 transform hover:scale-105 transition-transform duration-300 border-t-4 border-stone-800">
-             <div className="flex-shrink-0 bg-stone-800 text-amber-400 rounded-full p-4">
-                <StarIcon />
-             </div>
-             <div>
-                <p className="text-3xl font-bold text-stone-800 tracking-tight">{stats.totalAchievement.toFixed(1)}</p>
-                <p className="text-lg font-semibold text-stone-600 truncate">إجمالي الإنجاز العام</p>
-                <p className="text-sm text-stone-500 mt-1 font-medium">مجموع أوجه الحفظ والمراجعة والتثبيت لجميع الأسابيع</p>
-             </div>
-         </div>
+         <StatCard 
+            isMain
+            icon={<StarIcon />} 
+            label="إجمالي الإنجاز العام" 
+            value={stats.totalAchievement.toFixed(2)} 
+            description="مجموع كافة الأوجه (حفظ ومراجعة وتثبيت) لجميع الأسابيع"
+         />
       </div>
     </div>
   );
