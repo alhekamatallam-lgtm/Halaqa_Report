@@ -104,6 +104,7 @@ export interface EvalQuestion {
   id: number;
   que: string;
   mark: number;
+  tip?: string; // التوضيح المضاف من قبل المستخدم
 }
 
 export interface EvalSubmissionPayload {

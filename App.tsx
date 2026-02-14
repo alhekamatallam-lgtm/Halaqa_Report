@@ -100,19 +100,32 @@ const normalizeArabicForMatch = (text: string) => {
 };
 
 const parseAchievement = (value: any): Achievement => {
-  const strValue = String(value || '');
-  if (!strValue || !strValue.includes('%')) {
+  const strValue = String(value || '').trim();
+  if (!strValue) {
     return { achieved: 0, required: 0, formatted: '0 / 0', index: 0 };
   }
-  const parts = strValue.split('%');
-  const achieved = parseFloat(parts[0]) || 0;
-  const required = parseFloat(parts[1]) || 0;
-  return {
-    achieved,
-    required,
-    formatted: `${achieved} / ${required}`,
-    index: required > 0 ? achieved / required : 0,
-  };
+
+  // إذا كانت البيانات تحتوي على % للفصل بين المنجز والمطلوب
+  if (strValue.includes('%')) {
+    const parts = strValue.split('%');
+    const achieved = parseFloat(parts[0]) || 0;
+    const required = parseFloat(parts[1]) || 0;
+    return {
+      achieved,
+      required,
+      formatted: `${achieved} / ${required}`,
+      index: required > 0 ? achieved / required : 0,
+    };
+  } else {
+    // إذا كانت البيانات رقماً مباشراً (مثل 1.7)
+    const achieved = parseFloat(strValue) || 0;
+    return {
+      achieved,
+      required: 0, // لا يوجد مطلوب محدد في هذا التنسيق
+      formatted: `${achieved}`,
+      index: 0, // المؤشر صفر لعدم وجود قيمة "مطلوب" للمقارنة
+    };
+  }
 };
 
 /**
@@ -490,12 +503,18 @@ const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
         // Final precise attendance average from multiple entries in the same week
         student.attendance = entry.attendanceSum / entry.recordCount;
         
-        student.memorizationPages.formatted = `${student.memorizationPages.achieved.toFixed(1)} / ${student.memorizationPages.required.toFixed(1)}`;
+        // تحسين عرض النص: إذا لم يكن هناك "مطلوب" (0)، نعرض المنجز فقط
+        const formatStr = (ach: number, req: number) => req > 0 ? `${ach.toFixed(1)} / ${req.toFixed(1)}` : `${ach.toFixed(1)}`;
+        
+        student.memorizationPages.formatted = formatStr(student.memorizationPages.achieved, student.memorizationPages.required);
         student.memorizationPages.index = student.memorizationPages.required > 0 ? student.memorizationPages.achieved / student.memorizationPages.required : 0;
-        student.reviewPages.formatted = `${student.reviewPages.achieved.toFixed(1)} / ${student.reviewPages.required.toFixed(1)}`;
+        
+        student.reviewPages.formatted = formatStr(student.reviewPages.achieved, student.reviewPages.required);
         student.reviewPages.index = student.reviewPages.required > 0 ? student.reviewPages.achieved / student.reviewPages.required : 0;
-        student.consolidationPages.formatted = `${student.consolidationPages.achieved.toFixed(1)} / ${student.consolidationPages.required.toFixed(1)}`;
+        
+        student.consolidationPages.formatted = formatStr(student.consolidationPages.achieved, student.consolidationPages.required);
         student.consolidationPages.index = student.consolidationPages.required > 0 ? student.consolidationPages.achieved / student.consolidationPages.required : 0;
+        
         return student;
     });
 };
@@ -516,12 +535,16 @@ const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
         const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '', index: 0 } : memPages;
         const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '', index: 0 } : revPages;
         const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '', index: 0 } : conPages;
-        finalMemPages.formatted = `${finalMemPages.achieved.toFixed(1)} / ${finalMemPages.required.toFixed(1)}`;
+        
+        const formatStr = (ach: number, req: number) => req > 0 ? `${ach.toFixed(1)} / ${req.toFixed(1)}` : `${ach.toFixed(1)}`;
+
+        finalMemPages.formatted = formatStr(finalMemPages.achieved, finalMemPages.required);
         finalMemPages.index = finalMemPages.required > 0 ? finalMemPages.achieved / finalMemPages.required : 0;
-        finalRevPages.formatted = `${finalRevPages.achieved.toFixed(1)} / ${finalRevPages.required.toFixed(1)}`;
+        finalRevPages.formatted = formatStr(finalRevPages.achieved, finalRevPages.required);
         finalRevPages.index = finalRevPages.required > 0 ? finalRevPages.achieved / finalRevPages.required : 0;
-        finalConPages.formatted = `${finalConPages.achieved.toFixed(1)} / ${finalConPages.required.toFixed(1)}`;
+        finalConPages.formatted = formatStr(finalConPages.achieved, finalConPages.required);
         finalConPages.index = finalConPages.required > 0 ? finalConPages.achieved / finalConPages.required : 0;
+        
         const day = normalize(item["اليوم"]);
         return {
             id: `${username}-${day}-${index}`,
@@ -979,8 +1002,13 @@ const App: React.FC = () => {
     const handleRefreshTeacherData = async () => {
         setIsBackgroundUpdating(true);
         try {
-            const allDataJson = await fetchWithRetry(`${API_URL}&v=${new Date().getTime()}`);
-            processAllData(allDataJson.data || {});
+            const allDataJson = await fetchWithRetry(`${API_URL}?v=${new Date().getTime()}`);
+            if (!allDataJson.success) {
+                throw new Error("فشل في جلب البيانات من المصدر");
+            }
+            const dataContainer = allDataJson.data || {};
+            processAllData(dataContainer);
+            saveToCache(dataContainer);
             setNotification({ message: 'تم تحديث البيانات بنجاح.', type: 'success' });
         } catch (e) {
             setNotification({ message: 'حدث خطأ أثناء تحديث البيانات.', type: 'error' });
@@ -1075,7 +1103,7 @@ const App: React.FC = () => {
             case 'notes':
                 return <NotesPage students={students} />;
             case 'evaluation':
-                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} dailyStudents={dailyStudents} settings={settings} />;
+                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} allTeachers={teachersInfo} />;
             case 'excellence':
                 return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'combinedAttendance':
