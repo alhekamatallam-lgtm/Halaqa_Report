@@ -54,15 +54,21 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
 
   const handlePrint = () => {
     setPrintAllDetailed(false);
-    setTimeout(() => window.print(), 100);
+    document.body.classList.add('evaluation-print-active');
+    setTimeout(() => {
+        window.print();
+        document.body.classList.remove('evaluation-print-active');
+    }, 150);
   };
 
   const handlePrintAllDetailed = () => {
     setPrintAllDetailed(true);
+    document.body.classList.add('evaluation-print-active');
     setTimeout(() => {
         window.print();
         setPrintAllDetailed(false);
-    }, 100);
+        document.body.classList.remove('evaluation-print-active');
+    }, 150);
   };
 
   if (selectedReport) {
@@ -89,7 +95,7 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
             </button>
         </div>
 
-        <div className="bg-white p-8 md:p-12 rounded-2xl shadow-xl border border-stone-200 max-w-4xl mx-auto printable-area">
+        <div className="bg-white p-8 md:p-12 rounded-2xl shadow-xl border border-stone-200 max-w-4xl mx-auto printable-area print:shadow-none print:border-none print:p-0">
             {/* Header for Print */}
             <div className="text-center mb-10 border-b-2 border-stone-100 pb-8">
                 <img src="https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png" alt="Logo" className="h-20 mx-auto mb-4" />
@@ -207,7 +213,7 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
             </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden printable-area">
+        <div className="bg-white rounded-2xl shadow-xl border border-stone-200 printable-area print:shadow-none print:border-none">
             {/* Header for List Print (hidden on screen) */}
             <div className="hidden print:block mb-8 text-center border-b-2 border-stone-100 pb-6">
                 <img src="https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png" alt="Logo" className="h-16 mx-auto mb-3" />

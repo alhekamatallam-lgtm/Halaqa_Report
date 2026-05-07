@@ -65,6 +65,36 @@
         body.student-print-active > #root {
           display: none !important;
         }
+
+        body.evaluation-print-active #root [class*="Sidebar"],
+        body.evaluation-print-active > #root nav,
+        body.evaluation-print-active .print-hidden {
+          display: none !important;
+        }
+
+        body.evaluation-print-active,
+        body.evaluation-print-active #root,
+        body.evaluation-print-active #root > div,
+        body.evaluation-print-active #root main {
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+            position: relative !important;
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+        }
+
+        body.evaluation-print-active .printable-area {
+            display: block !important;
+            width: 100% !important;
+            overflow: visible !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
         .printable-student-report {
           display: block !important;
         }
