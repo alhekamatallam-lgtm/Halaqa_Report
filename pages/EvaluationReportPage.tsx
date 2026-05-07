@@ -16,6 +16,7 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedReport, setSelectedReport] = useState<ProcessedEvalResult | null>(initialSelectedReport || null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [printAllDetailed, setPrintAllDetailed] = useState(false);
 
   const filteredResults = useMemo(() => {
     let results = evalResults;
@@ -52,7 +53,16 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
   }, [filteredResults, currentPage]);
 
   const handlePrint = () => {
-    window.print();
+    setPrintAllDetailed(false);
+    setTimeout(() => window.print(), 100);
+  };
+
+  const handlePrintAllDetailed = () => {
+    setPrintAllDetailed(true);
+    setTimeout(() => {
+        window.print();
+        setPrintAllDetailed(false);
+    }, 100);
   };
 
   if (selectedReport) {
@@ -118,6 +128,7 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
                     <table className="min-w-full divide-y divide-stone-200">
                         <thead className="bg-stone-50">
                             <tr>
+                                <th className="px-6 py-4 text-center text-xs font-bold text-stone-600 uppercase tracking-wider w-12">#</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-stone-600 uppercase tracking-wider">السؤال / المعيار</th>
                                 <th className="px-6 py-4 text-center text-xs font-bold text-stone-600 uppercase tracking-wider w-32">الدرجة المستحقة</th>
                                 <th className="px-6 py-4 text-center text-xs font-bold text-stone-600 uppercase tracking-wider w-32">الدرجة القصوى</th>
@@ -126,6 +137,7 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
                         <tbody className="bg-white divide-y divide-stone-200">
                             {selectedReport.scores.map((score, idx) => (
                                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-stone-50/30'}>
+                                    <td className="px-6 py-4 text-center text-sm text-stone-500 font-medium">{idx + 1}</td>
                                     <td className="px-6 py-4 text-sm font-medium text-stone-800 leading-relaxed">{score.question}</td>
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
                                         <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm ${score.score >= (score.maxMark * 0.7) ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
@@ -168,7 +180,16 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                         </svg>
-                        <span>طباعة الكل</span>
+                        <span>طباعة الجدول</span>
+                    </button>
+                    <button 
+                         onClick={handlePrintAllDetailed}
+                         className="flex items-center justify-center gap-2 bg-amber-100 text-amber-700 px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition-all border border-amber-200 w-full md:w-auto"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>طباعة التقارير المفصلة</span>
                     </button>
                     <div className="relative w-full md:w-72">
                         <input 
@@ -198,6 +219,7 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
                 <table className="min-w-full divide-y divide-stone-200">
                     <thead className="bg-stone-50">
                         <tr>
+                            <th scope="col" className="px-6 py-4 text-center text-xs font-bold text-stone-600 uppercase tracking-wider w-12">#</th>
                             <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-stone-600 uppercase tracking-wider">المعلم</th>
                             <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-stone-600 uppercase tracking-wider">الحلقة</th>
                             <th scope="col" className="px-6 py-4 text-center text-xs font-bold text-stone-600 uppercase tracking-wider">الدرجة</th>
@@ -206,10 +228,12 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-stone-200">
-                        {paginatedResults.map((item) => {
+                        {paginatedResults.map((item, index) => {
                             const percentage = item.maxScore > 0 ? Math.round((item.totalScore / item.maxScore) * 100) : 0;
+                            const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index + 1;
                             return (
                                 <tr key={item.id} className="hover:bg-amber-50/40 transition-colors group">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-500 font-medium text-center">{globalIndex}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-stone-900">{item.teacherName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-stone-600">{item.circleName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-stone-800">
@@ -242,31 +266,78 @@ const EvaluationReportPage: React.FC<EvaluationReportPageProps> = ({ evalResults
                 </table>
             </div>
 
-            {/* Print View Table (All Filtered Results - Visible only on Print) */}
             <div className="hidden print:block">
-                <table className="min-w-full border-collapse border border-stone-300">
-                    <thead className="bg-stone-100">
-                        <tr>
-                            <th className="border border-stone-300 px-4 py-3 text-right">المعلم</th>
-                            <th className="border border-stone-300 px-4 py-3 text-right">الحلقة</th>
-                            <th className="border border-stone-300 px-4 py-3 text-center">الدرجة</th>
-                            <th className="border border-stone-300 px-4 py-3 text-center">النسبة</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredResults.map((item) => {
-                            const percentage = item.maxScore > 0 ? Math.round((item.totalScore / item.maxScore) * 100) : 0;
-                            return (
-                                <tr key={item.id}>
-                                    <td className="border border-stone-300 px-4 py-2 font-bold">{item.teacherName}</td>
-                                    <td className="border border-stone-300 px-4 py-2">{item.circleName}</td>
-                                    <td className="border border-stone-300 px-4 py-2 text-center">{item.totalScore} / {item.maxScore}</td>
-                                    <td className="border border-stone-300 px-4 py-2 text-center font-bold">{percentage}%</td>
+                {printAllDetailed ? (
+                    <div className="space-y-8">
+                        {filteredResults.map((report, rIdx) => (
+                            <div key={report.id} className={`${rIdx < filteredResults.length - 1 ? 'page-break' : ''} p-8`}>
+                                <div className="text-center mb-8 border-b border-stone-200 pb-6">
+                                    <img src="https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png" alt="Logo" className="h-16 mx-auto mb-3" />
+                                    <h1 className="text-2xl font-bold text-stone-800">تقرير زيارة معلم حلقة</h1>
+                                    <div className="flex justify-between mt-4 text-right px-4">
+                                        <p className="font-bold">المعلم: {report.teacherName}</p>
+                                        <p className="font-bold">الحلقة: {report.circleName}</p>
+                                    </div>
+                                </div>
+                                <div className="mb-6 flex justify-between items-center bg-stone-50 p-4 rounded-lg border border-stone-200">
+                                    <p className="font-bold">الدرجة الإجمالية:</p>
+                                    <p className="text-2xl font-black text-amber-600">{report.totalScore} / {report.maxScore}</p>
+                                </div>
+                                <table className="min-w-full border-collapse border border-stone-300 text-sm">
+                                    <thead className="bg-stone-100">
+                                        <tr>
+                                            <th className="border border-stone-300 px-3 py-2 text-right">#</th>
+                                            <th className="border border-stone-300 px-3 py-2 text-right">المعيار</th>
+                                            <th className="border border-stone-300 px-3 py-2 text-center w-20">الدرجة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {report.scores.map((s, sIdx) => (
+                                            <tr key={sIdx}>
+                                                <td className="border border-stone-300 px-3 py-2 text-center">{sIdx + 1}</td>
+                                                <td className="border border-stone-300 px-3 py-2">{s.question}</td>
+                                                <td className="border border-stone-300 px-3 py-2 text-center font-bold">{s.score} / {s.maxMark}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <>
+                        <div className="mb-8 text-center border-b-2 border-stone-100 pb-6">
+                            <img src="https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png" alt="Logo" className="h-16 mx-auto mb-3" />
+                            <h1 className="text-2xl font-bold text-stone-800">تقرير زيارات معلمي الحلقات</h1>
+                            <p className="text-stone-500 text-sm">{searchTerm ? `نتائج البحث عن: ${searchTerm}` : 'كافة الزيارات المسجلة'}</p>
+                        </div>
+                        <table className="min-w-full border-collapse border border-stone-300">
+                            <thead className="bg-stone-100">
+                                <tr>
+                                    <th className="border border-stone-300 px-4 py-3 text-center w-12">#</th>
+                                    <th className="border border-stone-300 px-4 py-3 text-right">المعلم</th>
+                                    <th className="border border-stone-300 px-4 py-3 text-right">الحلقة</th>
+                                    <th className="border border-stone-300 px-4 py-3 text-center">الدرجة</th>
+                                    <th className="border border-stone-300 px-4 py-3 text-center">النسبة</th>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                            </thead>
+                            <tbody>
+                                {filteredResults.map((item, idx) => {
+                                    const percentage = item.maxScore > 0 ? Math.round((item.totalScore / item.maxScore) * 100) : 0;
+                                    return (
+                                        <tr key={item.id}>
+                                            <td className="border border-stone-300 px-4 py-2 text-center">{idx + 1}</td>
+                                            <td className="border border-stone-300 px-4 py-2 font-bold">{item.teacherName}</td>
+                                            <td className="border border-stone-300 px-4 py-2">{item.circleName}</td>
+                                            <td className="border border-stone-300 px-4 py-2 text-center">{item.totalScore} / {item.maxScore}</td>
+                                            <td className="border border-stone-300 px-4 py-2 text-center font-bold">{percentage}%</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </>
+                )}
             </div>
 
             {filteredResults.length === 0 && (
