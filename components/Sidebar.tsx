@@ -19,7 +19,7 @@ import {
 } from './icons';
 import type { AuthenticatedUser } from '../types';
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'evaluationReport' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 interface SidebarProps {
   currentPage: Page;
@@ -97,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isCol
 
                  <NavSection title="التقييم والاختبارات" isCollapsed={isCollapsed}>
                     <NavLink label="زيارة معلم حلقة" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'evaluation'} isCollapsed={isCollapsed} onClick={() => onNavigate('evaluation')} />
+                    <NavLink label="تقارير زيارات المعلمين" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'evaluationReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('evaluationReport')} />
                     <NavLink label="إدخال الاختبارات" icon={<ClipboardCheckIcon className="w-5 h-5" />} isActive={currentPage === 'exam'} isCollapsed={isCollapsed} onClick={() => onNavigate('exam')} />
                     <NavLink label="تقرير الاختبارات" icon={<ClipboardListIcon className="w-5 h-5" />} isActive={currentPage === 'examReport'} isCollapsed={isCollapsed} onClick={() => onNavigate('examReport')} />
                  </NavSection>

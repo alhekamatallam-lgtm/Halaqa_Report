@@ -15,6 +15,7 @@ import CombinedAttendancePage from './pages/CombinedAttendancePage';
 import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
 import DailyStudentReportPage from './pages/DailyStudentReportPage';
 import DailyCircleReportPage from './pages/DailyCircleReportPage';
+import EvaluationReportPage from './pages/EvaluationReportPage';
 import ExamPage from './pages/ExamPage';
 import ExamReportPage from './pages/ExamReportPage';
 import StudentFollowUpPage from './pages/StudentFollowUpPage';
@@ -673,7 +674,7 @@ const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
     };
 };
 
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
+type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'evaluationReport' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 const App: React.FC = () => {
     const [students, setStudents] = useState<ProcessedStudentData[]>([]);
@@ -708,6 +709,7 @@ const App: React.FC = () => {
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [selectedEvalReport, setSelectedEvalReport] = useState<ProcessedEvalResult | null>(null);
 
     const asrTeachersInfo = useMemo(() => {
         return [...teachersInfo].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
@@ -1071,7 +1073,7 @@ const App: React.FC = () => {
     const handleNavigation = (page: Page) => {
         setInitialStudentFilter(null);
         setInitialDailyStudentFilter(null);
-        if (!authenticatedUser && ['evaluation', 'exam', 'settings'].includes(page)) {
+        if (!authenticatedUser && ['evaluation', 'evaluationReport', 'exam', 'settings'].includes(page)) {
             setCurrentPage(page);
             setShowPasswordModal(true);
             setIsMobileSidebarOpen(false);
@@ -1124,6 +1126,7 @@ const App: React.FC = () => {
         dailyDashboard: 'متابعة الحلقات (يومي)',
         notes: 'ملاحظات الطلاب',
         evaluation: `زيارات الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
+        evaluationReport: 'تقارير زيارات المعلمين',
         excellence: 'تميز الحلقات',
         combinedAttendance: `حضور الموظفين`,
         teacherAttendanceReport: 'تقرير حضور المعلمين',
@@ -1154,7 +1157,9 @@ const App: React.FC = () => {
             case 'notes':
                 return <NotesPage students={students} />;
             case 'evaluation':
-                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} allTeachers={teachersInfo} />;
+                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} allTeachers={teachersInfo} onSelectReport={(r) => { setSelectedEvalReport(r); setCurrentPage('evaluationReport'); }} />;
+            case 'evaluationReport':
+                return <EvaluationReportPage evalResults={evalResults} authenticatedUser={authenticatedUser} key={selectedEvalReport?.id || 'list'} initialSelectedReport={selectedEvalReport} />;
             case 'excellence':
                 return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'combinedAttendance':

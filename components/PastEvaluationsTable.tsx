@@ -7,9 +7,10 @@ const ITEMS_PER_PAGE = 5;
 
 interface PastEvaluationsTableProps {
   results: ProcessedEvalResult[];
+  onViewDetail?: (item: ProcessedEvalResult) => void;
 }
 
-const PastEvaluationsTable: React.FC<PastEvaluationsTableProps> = ({ results }) => {
+const PastEvaluationsTable: React.FC<PastEvaluationsTableProps> = ({ results, onViewDetail }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { paginatedResults, totalPages } = useMemo(() => {
@@ -30,6 +31,7 @@ const PastEvaluationsTable: React.FC<PastEvaluationsTableProps> = ({ results }) 
                     <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">المعلم</th>
                     <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">الحلقة</th>
                     <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">الدرجة الإجمالية</th>
+                    {onViewDetail && <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-stone-600 uppercase tracking-wider">الإجراءات</th>}
                 </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
@@ -44,6 +46,16 @@ const PastEvaluationsTable: React.FC<PastEvaluationsTableProps> = ({ results }) 
                                 <ProgressBar value={item.maxScore > 0 ? item.totalScore / item.maxScore : 0} />
                             </div>
                         </td>
+                        {onViewDetail && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                <button 
+                                    onClick={() => onViewDetail(item)}
+                                    className="text-amber-600 hover:text-amber-900 font-bold"
+                                >
+                                    عرض التفاصيل
+                                </button>
+                            </td>
+                        )}
                     </tr>
                     ))
                 ) : (

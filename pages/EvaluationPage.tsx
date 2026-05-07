@@ -11,9 +11,10 @@ interface EvaluationPageProps {
   evalResults: ProcessedEvalResult[];
   evalHeaderMap: Map<number, string>;
   allTeachers: TeacherInfo[];
+  onSelectReport?: (report: ProcessedEvalResult) => void;
 }
 
-const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting, authenticatedUser, evalQuestions, evalResults, evalHeaderMap, allTeachers }) => {
+const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting, authenticatedUser, evalQuestions, evalResults, evalHeaderMap, allTeachers, onSelectReport }) => {
   const [selectedTeacher, setSelectedTeacher] = useState('');
   const [selectedCircle, setSelectedCircle] = useState('');
   const [scores, setScores] = useState<Record<number, number | ''>>({});
@@ -208,7 +209,7 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
             </svg>
             سجل الزيارات السابقة
         </h3>
-        <PastEvaluationsTable results={filteredPastEvaluations} />
+        <PastEvaluationsTable results={filteredPastEvaluations} onViewDetail={onSelectReport} />
       </div>
     </div>
   );

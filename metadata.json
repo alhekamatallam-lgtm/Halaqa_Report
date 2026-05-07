@@ -1,5 +1,6 @@
 {
   "name": "منصة الحلقات الاصدار الثاني",
   "description": "لوحة تحكم تفاعلية لعرض وتحليل بيانات حلقات تحفيظ القرآن الكريم، مع فلاتر ديناميكية وتقارير مفصلة للطلاب.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }
