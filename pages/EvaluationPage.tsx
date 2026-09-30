@@ -85,9 +85,44 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
   }, [evalResults, authenticatedUser]);
 
   useEffect(() => {
-    setSelectedCircle('');
+    if (availableCircles.length > 0) {
+      setSelectedCircle(availableCircles[0]);
+    } else {
+      setSelectedCircle('');
+    }
     setScores({});
-  }, [selectedTeacher]);
+  }, [selectedTeacher, availableCircles]);
+
+  const handleSetAllMaxScores = () => {
+    const maxScores: Record<number, number> = {};
+    evalQuestions.forEach(q => {
+      maxScores[q.id] = q.mark;
+    });
+    setScores(maxScores);
+  };
+
+  const handleResetScores = () => {
+    setScores({});
+  };
+
+  const getQuickSteps = (maxMark: number): number[] => {
+    if (maxMark <= 5) {
+      return Array.from({ length: maxMark + 1 }, (_, i) => i);
+    }
+    if (maxMark === 10) {
+      return [0, 2, 4, 6, 8, 10];
+    }
+    if (maxMark === 15) {
+      return [0, 3, 6, 9, 12, 15];
+    }
+    const step = Math.max(1, Math.round(maxMark / 5));
+    const steps: number[] = [];
+    for (let i = 0; i < maxMark; i += step) {
+      steps.push(i);
+    }
+    if (!steps.includes(maxMark)) steps.push(maxMark);
+    return steps;
+  };
 
   const handleScoreChange = (questionId: number, value: string, maxMark: number) => {
     const numValue = parseInt(value, 10);
@@ -130,75 +165,125 @@ const EvaluationPage: React.FC<EvaluationPageProps> = ({ onSubmit, isSubmitting,
   };
   
   return (
-    <div className="space-y-8">
-      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl border border-stone-200">
-        <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-stone-800">نموذج زيارة معلم حلقة</h2>
-            <p className="text-stone-500 mt-2 text-sm">قم بتعبئة التقييم بناءً على المعايير الموضحة لكل سؤال</p>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="bg-white p-5 md:p-8 rounded-2xl shadow-xl border border-stone-200">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-stone-100 gap-4">
+            <div>
+                <h2 className="text-2xl font-bold text-stone-800">نموذج زيارة معلم حلقة</h2>
+                <p className="text-stone-500 mt-1 text-sm">نموذج سريع ومبسط لتقييم زيارة المعلم في الحلقة</p>
+            </div>
+            <div className="flex items-center gap-2 bg-stone-900 text-white px-5 py-3 rounded-xl shadow border-b-2 border-amber-500">
+                <span className="text-xs text-stone-300 font-semibold ml-2">المجموع:</span>
+                <span className="text-2xl font-extrabold text-amber-400">{currentTotalScore}</span>
+                <span className="text-xs text-stone-400">/ {maxTotalScore}</span>
+            </div>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-stone-50 rounded-xl border border-stone-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-stone-50 rounded-xl border border-stone-200/70">
                 <div>
-                    <label htmlFor="teacher-select" className="block text-sm font-bold text-stone-700 mb-2">المعلم</label>
-                    <select id="teacher-select" value={selectedTeacher} onChange={(e) => setSelectedTeacher(e.target.value)} required className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md shadow-sm">
+                    <label htmlFor="teacher-select" className="block text-sm font-bold text-stone-700 mb-1.5">المعلم</label>
+                    <select id="teacher-select" value={selectedTeacher} onChange={(e) => setSelectedTeacher(e.target.value)} required className="block w-full px-3 py-2.5 text-base bg-white border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-lg shadow-sm">
                         <option value="">-- اختر المعلم --</option>
                         {teacherNames.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label htmlFor="circle-select" className="block text-sm font-bold text-stone-700 mb-2">الحلقة</label>
-                    <select id="circle-select" value={selectedCircle} onChange={(e) => setSelectedCircle(e.target.value)} required disabled={!selectedTeacher} className="block w-full pl-3 pr-10 py-2 text-base border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md disabled:bg-stone-100 shadow-sm">
+                    <label htmlFor="circle-select" className="block text-sm font-bold text-stone-700 mb-1.5">الحلقة</label>
+                    <select id="circle-select" value={selectedCircle} onChange={(e) => setSelectedCircle(e.target.value)} required disabled={!selectedTeacher} className="block w-full px-3 py-2.5 text-base bg-white border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-lg disabled:bg-stone-100 shadow-sm">
                         <option value="">-- اختر الحلقة --</option>
                         {availableCircles.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
             </div>
 
-            <div className="pt-4 space-y-6">
-                {evalQuestions.map(q => (
-                    <div key={q.id} className="space-y-2 border-b border-stone-100 pb-6 last:border-0">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                            <label htmlFor={`q-${q.id}`} className="md:col-span-2 text-sm font-bold text-stone-700 flex items-start gap-2">
-                                <span className="bg-amber-100 text-amber-700 w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 text-xs">{q.id}</span>
-                                <div>
-                                    {q.que}
-                                    <span className="block md:inline-block md:mr-2 text-xs font-normal text-stone-500">(الدرجة القصوى: {q.mark})</span>
-                                </div>
-                            </label>
-                            <input
-                                type="number"
-                                id={`q-${q.id}`}
-                                value={scores[q.id] ?? 0}
-                                onChange={e => handleScoreChange(q.id, e.target.value, q.mark)}
-                                min="0"
-                                max={q.mark}
-                                placeholder="0"
-                                className="block w-full text-center py-2 text-base border border-stone-300 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm rounded-md font-bold text-stone-800 shadow-sm"
-                            />
-                        </div>
-                        {q.tip && (
-                            <div className="mr-8 md:mr-10 flex items-start gap-2 text-xs text-stone-600 bg-amber-50/50 p-2 rounded border-r-2 border-amber-300 italic">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>{q.tip}</span>
-                            </div>
-                        )}
+            {evalQuestions.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-50/70 px-4 py-2.5 rounded-xl border border-amber-200/60">
+                    <span className="text-xs font-bold text-amber-900">اختصارات سريعة للدرجات:</span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleSetAllMaxScores}
+                            className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                        >
+                            الدرجة الكاملة للكل ({maxTotalScore})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleResetScores}
+                            className="px-3 py-1.5 text-xs font-bold bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300 transition-colors"
+                        >
+                            تصفير الكل (0)
+                        </button>
                     </div>
-                ))}
+                </div>
+            )}
+
+            <div className="space-y-3">
+                {evalQuestions.map(q => {
+                    const currentVal = Number(scores[q.id] ?? 0);
+                    const quickSteps = getQuickSteps(q.mark);
+                    return (
+                        <div key={q.id} className="p-4 rounded-xl border border-stone-200 bg-stone-50/40 hover:bg-white hover:shadow-sm transition-all">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                <div className="flex items-start gap-2.5 flex-1">
+                                    <span className="bg-amber-500 text-stone-900 font-bold w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 text-xs mt-0.5">{q.id}</span>
+                                    <div className="space-y-1">
+                                        <label htmlFor={`q-${q.id}`} className="text-sm font-bold text-stone-800 cursor-pointer block">
+                                            {q.que}
+                                            <span className="inline-block mr-2 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">الدرجة: {q.mark}</span>
+                                        </label>
+                                        {q.tip && (
+                                            <p className="text-xs text-stone-500 leading-relaxed">{q.tip}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                        {quickSteps.map(stepVal => (
+                                            <button
+                                                key={stepVal}
+                                                type="button"
+                                                onClick={() => setScores(prev => ({ ...prev, [q.id]: stepVal }))}
+                                                className={`min-w-[2.25rem] h-9 px-2 rounded-lg text-xs font-bold border transition-all ${
+                                                    currentVal === stepVal
+                                                        ? 'bg-amber-500 text-stone-900 border-amber-600 shadow-sm scale-105'
+                                                        : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                                                }`}
+                                            >
+                                                {stepVal}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <input
+                                        type="number"
+                                        id={`q-${q.id}`}
+                                        value={scores[q.id] ?? 0}
+                                        onFocus={e => e.target.select()}
+                                        onChange={e => handleScoreChange(q.id, e.target.value, q.mark)}
+                                        min="0"
+                                        max={q.mark}
+                                        placeholder="0"
+                                        className="w-20 h-9 text-center text-sm border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 rounded-lg font-extrabold text-stone-900 shadow-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-stone-200">
-                <div className="text-center bg-stone-800 text-white px-8 py-4 rounded-2xl shadow-lg border-b-4 border-amber-500">
-                    <label className="block text-xs font-bold text-stone-400 uppercase tracking-wider">إجمالي الدرجة</label>
-                    <p className="text-4xl font-extrabold text-amber-400 mt-1">{currentTotalScore} <span className="text-lg text-stone-500 font-normal">/ {maxTotalScore}</span></p>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-stone-200">
+                <div className="flex items-center gap-4 bg-stone-800 text-white px-6 py-3 rounded-xl shadow border-b-4 border-amber-500 w-full sm:w-auto justify-center">
+                    <span className="text-sm font-bold text-stone-300">إجمالي الدرجة:</span>
+                    <span className="text-3xl font-extrabold text-amber-400">{currentTotalScore} <span className="text-base text-stone-400 font-normal">/ {maxTotalScore}</span></span>
                 </div>
-                 <button type="submit" disabled={isSubmitting} className="w-full md:w-auto h-14 px-12 text-lg font-bold text-stone-900 bg-amber-500 rounded-xl shadow-xl hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all duration-150 disabled:bg-amber-400 disabled:cursor-not-allowed transform hover:-translate-y-1">
+                <button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-12 px-10 text-base font-bold text-stone-900 bg-amber-500 rounded-xl shadow-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-all duration-150 disabled:bg-amber-300 disabled:cursor-not-allowed">
                     {isSubmitting ? 'جاري الإرسال...' : 'إرسال تقرير الزيارة'}
                 </button>
             </div>
-             {error && <p className="text-red-500 text-sm font-bold text-center mt-4 bg-red-50 p-2 rounded border border-red-100">{error}</p>}
+            {error && <p className="text-red-600 text-sm font-bold text-center mt-2 bg-red-50 p-2.5 rounded-lg border border-red-200">{error}</p>}
         </form>
       </div>
 

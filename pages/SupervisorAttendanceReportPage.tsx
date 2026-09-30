@@ -2,7 +2,7 @@
 import React from 'react';
 import type { SupervisorAttendanceReportEntry, SupervisorAttendanceSummaryEntry } from '../types';
 import AttendanceDetailModal from '../components/AttendanceDetailModal';
-import { PrintIcon, ExcelIcon } from '../components/icons';
+import { PrintIcon, ExcelIcon, RefreshIcon } from '../components/icons';
 import { ProgressBar } from '../components/ProgressBar';
 import Pagination from '../components/Pagination';
 
@@ -10,9 +10,11 @@ const ITEMS_PER_PAGE = 20;
 
 interface SupervisorAttendanceReportPageProps {
   reportData: SupervisorAttendanceReportEntry[];
+  onRefresh?: () => Promise<void>;
+  isRefreshing?: boolean;
 }
 
-const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPageProps> = ({ reportData }) => {
+const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPageProps> = ({ reportData, onRefresh, isRefreshing }) => {
   const [activeTab, setActiveTab] = React.useState<'detailed' | 'summary'>('detailed');
   const [modalData, setModalData] = React.useState<{ title: string; dates: string[] } | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -126,13 +128,21 @@ const SupervisorAttendanceReportPage: React.FC<SupervisorAttendanceReportPagePro
     </button>
   );
 
+  const handlePrint = () => {
+    document.body.classList.add('evaluation-print-active');
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('evaluation-print-active');
+    }, 150);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-end print-hidden gap-2">
             <button onClick={handleExport} className="px-4 h-10 text-sm font-semibold text-green-800 bg-green-100 rounded-md hover:bg-green-200 flex items-center gap-2">
                 <ExcelIcon /> تصدير لإكسل
             </button>
-            <button onClick={() => window.print()} className="px-4 h-10 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2">
+            <button onClick={handlePrint} className="px-4 h-10 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2">
               <PrintIcon /> طباعة
             </button>
       </div>

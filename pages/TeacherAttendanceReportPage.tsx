@@ -131,19 +131,21 @@ const TeacherAttendanceReportPage: React.FC<TeacherAttendanceReportPageProps> = 
     </button>
   );
 
+  const handlePrint = () => {
+    document.body.classList.add('evaluation-print-active');
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('evaluation-print-active');
+    }, 150);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-end print-hidden gap-2">
-        {onRefresh && (
-            <button onClick={onRefresh} disabled={isRefreshing} className="px-4 h-10 text-sm font-semibold text-amber-800 bg-amber-100 rounded-md hover:bg-amber-200 flex items-center gap-2 disabled:opacity-50">
-                <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'جاري التحديث...' : 'تحديث البيانات'}
-            </button>
-        )}
         <button onClick={handleExport} className="px-4 h-10 text-sm font-semibold text-green-800 bg-green-100 rounded-md hover:bg-green-200 flex items-center gap-2">
             <ExcelIcon /> تصدير لإكسل
         </button>
-        <button onClick={() => window.print()} className="px-4 h-10 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2">
+        <button onClick={handlePrint} className="px-4 h-10 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2">
             <PrintIcon /> طباعة
         </button>
       </div>

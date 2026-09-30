@@ -1,92 +1,36 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import StudentReportPage from './pages/StudentReportPage';
-import CircleReportPage from './pages/CircleReportPage';
-import GeneralReportPage from './pages/GeneralReportPage';
-import DashboardPage from './pages/DashboardPage';
-import DailyDashboardPage from './pages/DailyDashboardPage';
-import NotesPage from './pages/NotesPage';
 import EvaluationPage from './pages/EvaluationPage';
-import ExcellencePage from './pages/ExcellencePage';
-import TeacherAttendancePage from './pages/TeacherAttendancePage';
-import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
-import SupervisorAttendancePage from './pages/SupervisorAttendancePage';
-import CombinedAttendancePage from './pages/CombinedAttendancePage';
-import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
-import DailyStudentReportPage from './pages/DailyStudentReportPage';
-import DailyCircleReportPage from './pages/DailyCircleReportPage';
 import EvaluationReportPage from './pages/EvaluationReportPage';
-import ExamPage from './pages/ExamPage';
-import ExamReportPage from './pages/ExamReportPage';
-import StudentFollowUpPage from './pages/StudentFollowUpPage';
-import StudentAttendanceReportPage from './pages/StudentAttendanceReportPage';
-import StudentAbsenceReportPage from './pages/StudentAbsenceReportPage';
-import SettingsPage from './pages/SettingsPage';
-import TeacherListPage from './pages/TeacherListPage';
+import CombinedAttendancePage from './pages/CombinedAttendancePage';
+import TeacherAttendanceReportPage from './pages/TeacherAttendanceReportPage';
+import SupervisorAttendanceReportPage from './pages/SupervisorAttendanceReportPage';
 import PasswordModal from './components/PasswordModal';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, type Page } from './components/Sidebar';
 import Notification from './components/Notification';
-import type { RawStudentData, ProcessedStudentData, Achievement, ExamSubmissionData, RawSupervisorData, SupervisorData, RawTeacherAttendanceData, TeacherDailyAttendance, TeacherInfo, RawSupervisorAttendanceData, SupervisorAttendanceReportEntry, SupervisorDailyAttendance, SupervisorInfo, RawExamData, ProcessedExamData, RawRegisteredStudentData, ProcessedRegisteredStudentData, RawSettingData, ProcessedSettingsData, RawTeacherInfo, EvalQuestion, EvalSubmissionPayload, ProcessedEvalResult, RawEvalResult, RawProductorData, ProductorData, CombinedTeacherAttendanceEntry, AuthenticatedUser } from './types';
+import type {
+    RawSupervisorData,
+    SupervisorData,
+    RawTeacherAttendanceData,
+    TeacherDailyAttendance,
+    TeacherInfo,
+    RawSupervisorAttendanceData,
+    SupervisorAttendanceReportEntry,
+    SupervisorDailyAttendance,
+    RawTeacherInfo,
+    EvalQuestion,
+    EvalSubmissionPayload,
+    ProcessedEvalResult,
+    RawEvalResult,
+    RawProductorData,
+    ProductorData,
+    CombinedTeacherAttendanceEntry,
+    AuthenticatedUser,
+} from './types';
 import { MenuIcon } from './components/icons';
+import initialData from './initialData.json';
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbxbmwdJKfAZmeStYZv82hmNJkC1je_bY0IcfiJ1fhfo8Qz7I-b10Mb1Z-EcCpbjnTA/exec';
 const LOGO_URL = 'https://i.ibb.co/ZzqqtpZQ/1-page-001-removebg-preview.png';
-const CACHE_KEY = 'quran_app_data_v1';
-
-// --- IndexedDB Helpers ---
-const DB_NAME = 'QuranAppDB';
-const STORE_NAME = 'dataStore';
-const DB_VERSION = 1;
-
-const initDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-        if (!window.indexedDB) {
-            reject(new Error("IndexedDB not supported"));
-            return;
-        }
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
-            }
-        };
-    });
-};
-
-const getFromDB = async (key: string): Promise<any> => {
-    try {
-        const db = await initDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(key);
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve(request.result);
-        });
-    } catch (e) {
-        console.warn("Error reading from IndexedDB:", e);
-        return null;
-    }
-};
-
-const saveToDB = async (key: string, data: any): Promise<void> => {
-    try {
-        const db = await initDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.put(data, key);
-            request.onerror = () => reject(request.error);
-            request.onsuccess = () => resolve();
-        });
-    } catch (e) {
-        console.warn("Error saving to IndexedDB:", e);
-    }
-};
-// -------------------------
 
 const normalizeArabicForMatch = (text: string) => {
     if (!text) return '';
@@ -100,129 +44,65 @@ const normalizeArabicForMatch = (text: string) => {
         .trim();
 };
 
-const parsePercentage = (value: any): number => {
-    if (value === undefined || value === null || value === '') return 0;
-    let strValue = String(value).trim();
-    if (strValue.endsWith('%')) {
-        return (parseFloat(strValue.replace('%', '')) || 0) / 100;
-    }
-    const numValue = parseFloat(strValue);
-    if (isNaN(numValue)) return 0;
-    return numValue > 1 ? numValue / 100 : numValue;
-};
-
-/**
- * دالة محسنة لمعالجة بيانات الإنجاز بدقة رقمين عشريين (0.00)
- */
-const parseAchievement = (value: any, directPercentage?: any): Achievement => {
-  const strValue = String(value || '').trim();
-  const directIndex = directPercentage ? parsePercentage(directPercentage) : 0;
-  
-  if (directPercentage != null && directPercentage !== '') {
-      let achieved = parseFloat(strValue);
-      if (isNaN(achieved) || strValue.includes(':') || achieved > 500) achieved = 0; 
-
-      const required = directIndex > 0 ? achieved / directIndex : 0;
-
-      // التنسيق برقمين عشريين
-      const formatted = required > 0 
-        ? `${achieved.toFixed(2)} / ${required.toFixed(2)}` 
-        : `${achieved.toFixed(2)}`;
-
-      return {
-          achieved,
-          required,
-          formatted,
-          index: directIndex
-      };
-  }
-
-  if (!strValue) {
-    return { achieved: 0, required: 0, formatted: '0.00', index: 0 };
-  }
-
-  if (strValue.includes('%')) {
-    const parts = strValue.split('%');
-    const achieved = parseFloat(parts[0]) || 0;
-    const required = parseFloat(parts[1]) || 0;
-    const index = required > 0 ? achieved / required : 0;
-    return {
-      achieved,
-      required,
-      formatted: `${achieved.toFixed(2)} / ${required.toFixed(2)}`,
-      index,
-    };
-  } else {
-    const achieved = parseFloat(strValue) || 0;
-    return {
-      achieved,
-      required: 0,
-      formatted: `${achieved.toFixed(2)}`,
-      index: 0,
-    };
-  }
-};
-
 const processEvalResultsData = (
-  data: RawEvalResult[],
-  questions: EvalQuestion[]
+    data: RawEvalResult[],
+    questions: EvalQuestion[]
 ): { processedResults: ProcessedEvalResult[]; headerMap: Map<number, string> } => {
-  const headerMap = new Map<number, string>();
-  const maxScore = questions.reduce((sum, q) => sum + q.mark, 0);
+    const headerMap = new Map<number, string>();
+    const maxScore = questions.reduce((sum, q) => sum + q.mark, 0);
 
-  if (data.length > 0) {
-    const firstRow = data[0];
-    const headers = Object.keys(firstRow);
-    const normalize = (text: string): string =>
-      String(text || '')
-        .normalize('NFC')
-        .replace(/[\u200B-\u200D\uFEFF\s]/g, '') 
-        .replace(/[إأآا]/g, 'ا'); 
+    if (data.length > 0) {
+        const firstRow = data[0];
+        const headers = Object.keys(firstRow);
+        const normalize = (text: string): string =>
+            String(text || '')
+                .normalize('NFC')
+                .replace(/[\u200B-\u200D\uFEFF\s]/g, '')
+                .replace(/[إأآا]/g, 'ا');
 
-    questions.forEach(q => {
-      const normalizedQue = normalize(q.que);
-      const foundHeader = headers.find(h => normalize(h) === normalizedQue);
-      if (foundHeader) {
-        headerMap.set(q.id, foundHeader.trim()); 
-      } else {
-        headerMap.set(q.id, q.que.trim());
-      }
-    });
-  } else {
-    questions.forEach(q => {
-        headerMap.set(q.id, q.que.trim());
-    });
-  }
+        questions.forEach(q => {
+            const normalizedQue = normalize(q.que);
+            const foundHeader = headers.find(h => normalize(h) === normalizedQue);
+            if (foundHeader) {
+                headerMap.set(q.id, foundHeader.trim());
+            } else {
+                headerMap.set(q.id, q.que.trim());
+            }
+        });
+    } else {
+        questions.forEach(q => {
+            headerMap.set(q.id, q.que.trim());
+        });
+    }
 
-  const processedResults = data.map((row, index) => {
-    let totalScore = 0;
-    const scores = questions.map(q => {
-      const header = headerMap.get(q.id);
-      if (!header) {
-        return { question: q.que, score: 0, maxMark: q.mark };
-      }
-      const score = Number(row[header as keyof RawEvalResult]) || 0;
-      totalScore += score;
-      return {
-        question: q.que,
-        score: score,
-        maxMark: q.mark,
-      };
-    });
+    const processedResults = data.map((row, index) => {
+        let totalScore = 0;
+        const scores = questions.map(q => {
+            const header = headerMap.get(q.id);
+            if (!header) {
+                return { question: q.que, score: 0, maxMark: q.mark };
+            }
+            const score = Number(row[header as keyof RawEvalResult]) || 0;
+            totalScore += score;
+            return {
+                question: q.que,
+                score: score,
+                maxMark: q.mark,
+            };
+        });
 
-    return {
-      id: `${row['المعلم']}-${row['الحلقة']}-${index}`,
-      teacherName: String(row['المعلم'] || ''),
-      circleName: String(row['الحلقة'] || ''),
-      totalScore,
-      maxScore,
-      scores,
-    };
-  }).sort((a,b) => b.totalScore - a.totalScore);
+        return {
+            id: `${row['المعلم']}-${row['الحلقة']}-${index}`,
+            teacherName: String(row['المعلم'] || ''),
+            circleName: String(row['الحلقة'] || ''),
+            totalScore,
+            maxScore,
+            scores,
+        };
+    }).sort((a, b) => b.totalScore - a.totalScore);
 
-  return { processedResults, headerMap };
+    return { processedResults, headerMap };
 };
-
 
 const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
     const supervisorMap = new Map<string, { supervisorName: string; password: string; circles: string[] }>();
@@ -236,7 +116,7 @@ const processSupervisorData = (data: RawSupervisorData[]): SupervisorData[] => {
             if (!supervisorMap.has(supervisorId)) {
                 supervisorMap.set(supervisorId, { supervisorName, password, circles: [] });
             }
-            
+
             const supervisorEntry = supervisorMap.get(supervisorId)!;
             if (circle && !supervisorEntry.circles.includes(circle)) {
                 supervisorEntry.circles.push(circle);
@@ -281,8 +161,8 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
 
     data.forEach(item => {
         const id = Number(item.teacher_id);
-        const rawDate = String(item['تاريخ العملية'] || '').trim().split(' ')[0]; 
-        const rawTime = String(item['وقت العملية'] || '').trim().split(' ').pop() || ''; 
+        const rawDate = String(item['تاريخ العملية'] || '').trim().split(' ')[0];
+        const rawTime = String(item['وقت العملية'] || '').trim().split(' ').pop() || '';
 
         if (isNaN(id) || !rawDate || !rawTime) return;
 
@@ -297,7 +177,7 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
 
     groupMap.forEach((group, key) => {
         const info = teacherLookup.get(group.id);
-        if (!info) return; 
+        if (!info) return;
 
         const sortedTimes = group.times.sort();
         const checkInTime = sortedTimes[0];
@@ -319,17 +199,12 @@ const processTeacherAttendanceReportData = (data: RawTeacherAttendanceData[], te
     return report.sort((a, b) => b.date.localeCompare(a.date));
 };
 
-/**
- * دالة مساعدة لتحويل التاريخ والوقت من الشيت إلى كائن Date
- */
 const parseAttendanceTime = (dateStr: string, timeStr: string): Date | null => {
     try {
-        // التاريخ غالباً بتنسيق YYYY-MM-DD
-        // الوقت غالباً بتنسيق HH:mm:ss
         const datePart = dateStr.split(' ')[0];
         const timePart = timeStr.split(' ').pop() || '';
         if (!datePart || !timePart) return null;
-        
+
         const d = new Date(`${datePart}T${timePart}`);
         return isNaN(d.getTime()) ? null : d;
     } catch (e) {
@@ -352,12 +227,12 @@ const processTeacherAttendanceData = (data: RawTeacherAttendanceData[], allTeach
 
         const dateStr = String(item['تاريخ العملية'] || '');
         const timeStr = String(item['وقت العملية'] || '');
-        
+
         if (dateStr.includes(todayRiyadhStr)) {
             const record = teacherRecords.get(id)!;
             const status = (item.status || '').trim();
             const actualTime = parseAttendanceTime(dateStr, timeStr);
-            
+
             if (status === 'حضور' || status === 'الحضور') {
                 record.checkIn = actualTime;
             } else if (status === 'انصراف') {
@@ -386,7 +261,7 @@ const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], al
     data.forEach(item => {
         const supervisorId = String(item.id || '').trim();
         if (!supervisorId || !supervisorRecords.has(supervisorId)) return;
-        
+
         const dateStr = String(item['تاريخ العملية'] || '');
         const timeStr = String(item['وقت العملية'] || '');
 
@@ -414,9 +289,9 @@ const processSupervisorAttendanceData = (data: RawSupervisorAttendanceData[], al
 const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData[], allSupervisors: SupervisorData[]): SupervisorAttendanceReportEntry[] => {
     const supervisorLookup = new Map<string, { name: string, circle: string }>();
     allSupervisors.forEach(s => {
-        supervisorLookup.set(s.id, { 
-            name: s.supervisorName, 
-            circle: s.circles.join('، ') || '—' 
+        supervisorLookup.set(s.id, {
+            name: s.supervisorName,
+            circle: s.circles.join('، ') || '—'
         });
     });
 
@@ -438,7 +313,7 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
 
     const report: SupervisorAttendanceReportEntry[] = [];
 
-    groupMap.forEach((group, key) => {
+    groupMap.forEach((group) => {
         const info = supervisorLookup.get(group.id);
         if (!info) return;
 
@@ -460,230 +335,56 @@ const processSupervisorAttendanceReportData = (data: RawSupervisorAttendanceData
     return report.sort((a, b) => b.date.localeCompare(a.date));
 };
 
-
-const processData = (data: RawStudentData[]): ProcessedStudentData[] => {
-    const studentWeekMap = new Map<string, {
-        data: ProcessedStudentData;
-        attendanceSum: number;
-        recordCount: number;
-        memIndexSum: number;
-        revIndexSum: number;
-        conIndexSum: number;
-    }>();
-    let lastKey: string | null = null;
-
-    const normalize = (val: any): string => {
-        const str = String(val || '');
-        return str.normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(/\s+/g, ' ');
-    };
-
-    for (const item of data) {
-        const username = item["اسم المستخدم"];
-        const studentName = normalize(item["الطالب"]);
-        const week = normalize(item["الأسبوع"] || item["الاسبوع"]);
-
-        let currentKey: string | null = null;
-        if (username != null && studentName && week) {
-            currentKey = `${username}-${week}`;
-            lastKey = currentKey;
-        } else {
-            currentKey = lastKey;
-        }
-        if (!currentKey) continue;
-
-        const attendance = parsePercentage(item["نسبة الحضور"]);
-        const memPages = parseAchievement(item["أوجه الحفظ"], item["نسبة إنجاز خطة الحفظ"]);
-        const revPages = parseAchievement(item["أوجه المراجه"], item["نسبة إنجاز خطة المراجعة"]);
-        const conPages = parseAchievement(item["أوجه التثبيت"], item["نسبة إنجاز خطة التثبيت"]);
-        
-        const points = Number(item["اجمالي النقاط"]) || 0;
-        const memLessons = normalize(item["دروس الحفظ"]);
-        const revLessons = normalize(item["دروس المراجعة"]);
-
-        if (studentWeekMap.has(currentKey)) {
-            const entry = studentWeekMap.get(currentKey)!;
-            const existingStudent = entry.data;
-            existingStudent.memorizationPages.achieved += memPages.achieved;
-            existingStudent.memorizationPages.required += memPages.required;
-            existingStudent.reviewPages.achieved += revPages.achieved;
-            existingStudent.reviewPages.required += revPages.required;
-            existingStudent.consolidationPages.achieved += conPages.achieved;
-            existingStudent.consolidationPages.required += conPages.required;
-            existingStudent.totalPoints += points;
-            
-            entry.attendanceSum += attendance;
-            entry.memIndexSum += memPages.index;
-            entry.revIndexSum += revPages.index;
-            entry.conIndexSum += conPages.index;
-            entry.recordCount += 1;
-
-            if (memLessons) existingStudent.memorizationLessons = existingStudent.memorizationLessons ? `${existingStudent.memorizationLessons}, ${memLessons}` : memLessons;
-            if (revLessons) existingStudent.reviewLessons = existingStudent.reviewLessons ? `${existingStudent.reviewLessons}, ${revLessons}` : revLessons;
-        } else {
-            if (!studentName || username == null || !week) continue;
-            const circle = normalize(item["الحلقة"]);
-            const isTabyan = circle.includes('التبيان');
-            const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '100%', index: 1 } : memPages;
-            const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '100%', index: 1 } : revPages;
-            const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '100%', index: 1 } : conPages;
-
-            const newStudent: ProcessedStudentData = {
-                id: currentKey,
-                studentName,
-                username,
-                circle,
-                circleTime: normalize(item["وقت الحلقة"]),
-                memorizationLessons: memLessons,
-                memorizationPages: finalMemPages,
-                reviewLessons: revLessons,
-                reviewPages: finalRevPages,
-                consolidationPages: finalConPages,
-                teacherName: normalize(item["اسم المعلم"]),
-                program: normalize(item["البرنامج"]),
-                attendance: attendance, 
-                totalPoints: points,
-                guardianMobile: normalize(item["جوال ولي الأمر"]),
-                week: week,
-            };
-            studentWeekMap.set(currentKey, { 
-                data: newStudent, 
-                attendanceSum: attendance, 
-                memIndexSum: memPages.index,
-                revIndexSum: revPages.index,
-                conIndexSum: conPages.index,
-                recordCount: 1 
-            });
-        }
-    }
-    
-    return Array.from(studentWeekMap.values()).map(entry => {
-        const student = entry.data;
-        const count = entry.recordCount;
-        student.attendance = entry.attendanceSum / count;
-        
-        // إعادة بناء نصوص الإنجاز المجمعة بدقة رقمين عشريين
-        const updateFormatted = (ach: number, req: number) => {
-            return req > 0 ? `${ach.toFixed(2)} / ${req.toFixed(2)}` : `${ach.toFixed(2)}`;
+// طلب "متحوّط": خادم Google Apps Script يتأخر أحياناً أو يرجع 404 بشكل عشوائي،
+// فإذا تأخر الرد نرسل نسخة إضافية من نفس الطلب ونأخذ أول رد سليم
+const hedgedFetchJson = (
+    makeRequest: () => Promise<Response>,
+    opts: { hedgeAfterMs: number; maxAttempts: number; totalTimeoutMs: number }
+): Promise<any> =>
+    new Promise((resolve, reject) => {
+        let done = false;
+        let attempts = 0;
+        let failures = 0;
+        let lastError: any = null;
+        let hedgeTimer: any = null;
+        const finish = (fn: () => void) => {
+            if (done) return;
+            done = true;
+            clearTimeout(hedgeTimer);
+            clearTimeout(totalTimer);
+            fn();
         };
-
-        const avgMemIdx = entry.memIndexSum / count;
-        const avgRevIdx = entry.revIndexSum / count;
-        const avgConIdx = entry.conIndexSum / count;
-
-        student.memorizationPages.index = avgMemIdx;
-        student.memorizationPages.formatted = updateFormatted(student.memorizationPages.achieved, student.memorizationPages.required);
-        
-        student.reviewPages.index = avgRevIdx;
-        student.reviewPages.formatted = updateFormatted(student.reviewPages.achieved, student.reviewPages.required);
-
-        student.consolidationPages.index = avgConIdx;
-        student.consolidationPages.formatted = updateFormatted(student.consolidationPages.achieved, student.consolidationPages.required);
-        
-        return student;
+        const totalTimer = setTimeout(
+            () => finish(() => reject(lastError || new Error('انتهت مهلة الاتصال بالخادم'))),
+            opts.totalTimeoutMs
+        );
+        const launch = () => {
+            if (done || attempts >= opts.maxAttempts) return;
+            attempts++;
+            clearTimeout(hedgeTimer);
+            hedgeTimer = setTimeout(launch, opts.hedgeAfterMs);
+            makeRequest()
+                .then(async res => {
+                    const text = await res.text();
+                    if (!res.ok || !text.trim().startsWith('{')) throw new Error(`HTTP ${res.status}`);
+                    const json = JSON.parse(text);
+                    finish(() => resolve(json));
+                })
+                .catch(err => {
+                    failures++;
+                    lastError = err;
+                    if (done) return;
+                    if (attempts < opts.maxAttempts) launch();
+                    else if (failures >= attempts) finish(() => reject(err));
+                });
+        };
+        launch();
     });
-};
-
-const processDailyData = (data: RawStudentData[]): ProcessedStudentData[] => {
-    const normalize = (val: any): string => String(val || '').normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().replace(/\s+/g, ' ');
-
-    return data.map((item, index): ProcessedStudentData | null => {
-        const studentName = normalize(item["الطالب"]);
-        const usernameRaw = item["اسم المستخدم"];
-        if (!studentName || usernameRaw == null) return null;
-        const username = Number(usernameRaw);
-        const circle = normalize(item["الحلقة"]);
-        const isTabyan = circle.includes('التبيان');
-
-        const memPages = parseAchievement(item["أوجه الحفظ"], item["نسبة إنجاز خطة الحفظ"]);
-        const revPages = parseAchievement(item["أوجه المراجه"], item["نسبة إنجاز خطة المراجعة"]);
-        const conPages = parseAchievement(item["أوجه التثبيت"], item["نسبة إنجاز خطة التثبيت"]);
-
-        const finalMemPages = isTabyan ? { achieved: 0, required: memPages.required, formatted: '100%', index: 1 } : memPages;
-        const finalRevPages = isTabyan ? { achieved: 0, required: revPages.required, formatted: '100%', index: 1 } : revPages;
-        const finalConPages = isTabyan ? { achieved: 0, required: conPages.required, formatted: '100%', index: 1 } : conPages;
-        
-        const day = normalize(item["اليوم"]);
-        return {
-            id: `${username}-${day}-${index}`,
-            studentName,
-            username,
-            circle,
-            circleTime: normalize(item["وقت الحلقة"]),
-            memorizationLessons: normalize(item["دروس الحفظ"]),
-            memorizationPages: finalMemPages,
-            reviewLessons: normalize(item["دروس المراجعة"]),
-            reviewPages: finalRevPages,
-            consolidationPages: finalConPages,
-            teacherName: normalize(item["اسم المعلم"]),
-            program: normalize(item["البرنامج"]),
-            attendance: parsePercentage(item["نسبة الحضور"]),
-            totalPoints: Number(item["اجمالي النقاط"]) || 0,
-            guardianMobile: normalize(item["جوال ولي الأمر"]),
-            day: day,
-        };
-    }).filter((item): item is ProcessedStudentData => item !== null);
-};
-
-const processExamData = (data: RawExamData[]): ProcessedExamData[] => {
-    const normalize = (val: any): string => String(val || '').trim();
-    const parseNum = (val: any): number => Number(val) || 0;
-    return data.map(item => {
-        const studentName = normalize(item["الطالب"]);
-        if (!studentName) return null;
-        return {
-            studentName,
-            circle: normalize(item["الحلقة"]),
-            examName: normalize(item["الاختبار  "]),
-            q1: parseNum(item["السؤال الاول"]),
-            q2: parseNum(item["السؤال الثاني"]),
-            q3: parseNum(item["السؤال الثالث"]),
-            q4: parseNum(item["السؤال الرابع"]),
-            q5: parseNum(item["السؤال الخامس"]),
-            totalScore: parseNum(item["إجمالي الدرجة"]),
-        };
-    }).filter((item): item is ProcessedExamData => item !== null);
-};
-
-const processRegisteredStudentData = (data: RawRegisteredStudentData[]): ProcessedRegisteredStudentData[] => {
-    const normalize = (val: any): string => String(val || '').trim();
-    return data.map(item => {
-            const studentName = normalize(item["الطالب"]);
-            const circle = normalize(item["الحلقة"]);
-            if (!studentName || !circle) return null;
-            return { studentName, circle };
-        }).filter((item): item is ProcessedRegisteredStudentData => item !== null);
-};
-
-const extractTimeFromSheetDate = (value: string | undefined): string => {
-    if (!value || typeof value !== 'string') return '';
-    const timeMatch = value.match(/\d{2}:\d{2}/);
-    return timeMatch ? timeMatch[0] : '';
-};
-
-const processSettingsData = (data: RawSettingData[]): ProcessedSettingsData => {
-    if (!data || !Array.isArray(data) || data.length === 0) return {};
-    const firstRow = data[0];
-    if (!firstRow) return {};
-    return {
-        default_student_count_day: firstRow["اليوم الافتراضي"] || '',
-        teacher_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المعلمين"]),
-        teacher_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمعلمين"]),
-        supervisor_late_checkin_time: extractTimeFromSheetDate(firstRow["وقت تأخر حضور المشرفين"]),
-        supervisor_early_checkout_time: extractTimeFromSheetDate(firstRow["وقت انصراف مبكر للمشرفين"]),
-        avg_attendance: String(firstRow["متوسط الحضور"] || '0'),
-    };
-};
-
-type Page = 'students' | 'circles' | 'general' | 'dashboard' | 'notes' | 'evaluation' | 'evaluationReport' | 'excellence' | 'combinedAttendance' | 'teacherAttendanceReport' | 'dailyStudents' | 'dailyCircles' | 'dailyDashboard' | 'supervisorAttendanceReport' | 'exam' | 'examReport' | 'studentFollowUp' | 'studentAttendanceReport' | 'studentAbsenceReport' | 'settings' | 'teacherList';
 
 const App: React.FC = () => {
-    const [students, setStudents] = useState<ProcessedStudentData[]>([]);
-    const [dailyStudents, setDailyStudents] = useState<ProcessedStudentData[]>([]);
     const [evalQuestions, setEvalQuestions] = useState<EvalQuestion[]>([]);
     const [evalResults, setEvalResults] = useState<ProcessedEvalResult[]>([]);
     const [evalHeaderMap, setEvalHeaderMap] = useState<Map<number, string>>(new Map());
-    const [examData, setExamData] = useState<ProcessedExamData[]>([]);
-    const [registeredStudents, setRegisteredStudents] = useState<ProcessedRegisteredStudentData[]>([]);
     const [supervisors, setSupervisors] = useState<SupervisorData[]>([]);
     const [productors, setProductors] = useState<ProductorData[]>([]);
     const [teachersInfo, setTeachersInfo] = useState<TeacherInfo[]>([]);
@@ -691,19 +392,18 @@ const App: React.FC = () => {
     const [combinedTeacherAttendanceLog, setCombinedTeacherAttendanceLog] = useState<CombinedTeacherAttendanceEntry[]>([]);
     const [supervisorAttendance, setSupervisorAttendance] = useState<SupervisorDailyAttendance[]>([]);
     const [supervisorAttendanceReport, setSupervisorAttendanceReport] = useState<SupervisorAttendanceReportEntry[]>([]);
-    const [settings, setSettings] = useState<ProcessedSettingsData>({});
-    
+
     const [isLoading, setIsLoading] = useState(true);
-    const [loadingMessage, setLoadingMessage] = useState("جاري التحميل...");
-    const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
-    
+    const [loadingMessage] = useState("جاري التحميل...");
+
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [liveReady, setLiveReady] = useState(false);
+    const [liveLoadFailed, setLiveLoadFailed] = useState(false);
+    const [fullLoaded, setFullLoaded] = useState(false);
     const [submittingTeacher, setSubmittingTeacher] = useState<string | null>(null);
     const [submittingSupervisor, setSubmittingSupervisor] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [currentPage, setCurrentPage] = useState<Page>('general');
-    const [initialStudentFilter, setInitialStudentFilter] = useState<{ circle: string } | null>(null);
-    const [initialDailyStudentFilter, setInitialDailyStudentFilter] = useState<{ circle: string } | null>(null);
+    const [currentPage, setCurrentPage] = useState<Page>('combinedAttendance');
     const [authenticatedUser, setAuthenticatedUser] = useState<AuthenticatedUser | null>(null);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -719,167 +419,103 @@ const App: React.FC = () => {
         if (notification) {
             const timer = setTimeout(() => {
                 setNotification(null);
-            }, 5000);
+            }, 4000);
             return () => clearTimeout(timer);
         }
     }, [notification]);
 
-    const fetchWithRetry = async (url: string, retries = 2, timeout = 25000) => {
-        for (let i = 0; i <= retries; i++) {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            
-            try {
-                const response = await fetch(url, { signal: controller.signal });
-                clearTimeout(id);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return await response.json();
-            } catch (err: any) {
-                clearTimeout(id);
-                if (i === retries) throw err;
-                await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
-            }
-        }
-    };
-
     const processAllData = (dataContainer: any) => {
-         const allStudentsRaw = dataContainer.report || [];
-         const sanitizedStudentsRaw = allStudentsRaw.map((row: any) => {
-             const newRow: { [key: string]: any } = {};
-             Object.keys(row).forEach(key => {
-                 const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
-                 newRow[cleanedKey] = row[key];
-             });
-             return newRow;
-         });
-         setStudents(processData(sanitizedStudentsRaw as RawStudentData[]));
+        const evalQuestionsData = dataContainer.eval;
+        if (evalQuestionsData && Array.isArray(evalQuestionsData)) {
+            const questions = evalQuestionsData as EvalQuestion[];
+            setEvalQuestions(questions);
+            const evalResultsData = dataContainer.Eval_result || [];
+            const { processedResults, headerMap } = processEvalResultsData(evalResultsData as RawEvalResult[], questions);
+            setEvalResults(processedResults);
+            setEvalHeaderMap(headerMap);
+        }
 
-         const dailySheetData = dataContainer.daily;
-         if (dailySheetData && Array.isArray(dailySheetData)) {
-             setDailyStudents(processDailyData(dailySheetData as RawStudentData[]));
-         }
-         
-         const evalQuestionsData = dataContainer.eval;
-         if (evalQuestionsData && Array.isArray(evalQuestionsData)) {
-             const questions = evalQuestionsData as EvalQuestion[];
-             setEvalQuestions(questions);
-             const evalResultsData = dataContainer.Eval_result || [];
-             const { processedResults, headerMap } = processEvalResultsData(evalResultsData as RawEvalResult[], questions);
-             setEvalResults(processedResults);
-             setEvalHeaderMap(headerMap);
-         }
+        const supervisorSheetData = dataContainer['supervisor'];
+        let currentSupervisors: SupervisorData[] = [];
+        if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
+            currentSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
+            setSupervisors(currentSupervisors);
+        }
 
-         const examSheetData = dataContainer.exam;
-         if (examSheetData && Array.isArray(examSheetData)) {
-             setExamData(processExamData(examSheetData as RawExamData[]));
-         }
+        const productorSheetData = dataContainer.productor;
+        if (productorSheetData && Array.isArray(productorSheetData)) {
+            setProductors(processProductorData(productorSheetData as RawProductorData[]));
+        }
 
-         const registeredStudentData = dataContainer.regstudent;
-         if (registeredStudentData && Array.isArray(registeredStudentData)) {
-             setRegisteredStudents(processRegisteredStudentData(registeredStudentData as RawRegisteredStudentData[]));
-         }
+        let currentAsrTeachers: TeacherInfo[] = [];
+        const teachersSheetData = dataContainer.teachers;
+        if (teachersSheetData && Array.isArray(teachersSheetData)) {
+            currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
+        }
+        setTeachersInfo(currentAsrTeachers);
 
-         const supervisorSheetData = dataContainer['supervisor'];
-         let currentSupervisors: SupervisorData[] = [];
-         if (supervisorSheetData && Array.isArray(supervisorSheetData)) {
-             currentSupervisors = processSupervisorData(supervisorSheetData as RawSupervisorData[]);
-             setSupervisors(currentSupervisors);
-         }
+        const attendanceRaw = dataContainer.attandance || [];
+        if (attendanceRaw && Array.isArray(attendanceRaw)) {
+            setTeacherAttendance(processTeacherAttendanceData(attendanceRaw as RawTeacherAttendanceData[], currentAsrTeachers));
+            setCombinedTeacherAttendanceLog(processTeacherAttendanceReportData(attendanceRaw as RawTeacherAttendanceData[], currentAsrTeachers));
+        }
 
-         const productorSheetData = dataContainer.productor;
-         if (productorSheetData && Array.isArray(productorSheetData)) {
-             setProductors(processProductorData(productorSheetData as RawProductorData[]));
-         }
-
-         let currentAsrTeachers: TeacherInfo[] = [];
-         const teachersSheetData = dataContainer.teachers;
-         if (teachersSheetData && Array.isArray(teachersSheetData)) {
-             currentAsrTeachers = processTeachersInfoData(teachersSheetData as RawTeacherInfo[]);
-         }
-         setTeachersInfo(currentAsrTeachers);
-         
-         const attendanceRaw = dataContainer.attandance || [];
-         if (attendanceRaw && Array.isArray(attendanceRaw)) {
-             setTeacherAttendance(processTeacherAttendanceData(attendanceRaw as RawTeacherAttendanceData[], currentAsrTeachers));
-             setCombinedTeacherAttendanceLog(processTeacherAttendanceReportData(attendanceRaw as RawTeacherAttendanceData[], currentAsrTeachers));
-         }
-
-         const responRaw = dataContainer.respon || [];
-         if (Array.isArray(responRaw)) {
-             setSupervisorAttendance(processSupervisorAttendanceData(responRaw as RawSupervisorAttendanceData[], currentSupervisors));
-             setSupervisorAttendanceReport(processSupervisorAttendanceReportData(responRaw as RawSupervisorAttendanceData[], currentSupervisors));
-         }
-
-         const settingsSheetData = dataContainer.setting;
-         if (settingsSheetData && Array.isArray(settingsSheetData)) {
-             const sanitizedSettingsRaw = settingsSheetData.map((row: any) => {
-                 const newRow: { [key: string]: any } = {};
-                 Object.keys(row).forEach(key => {
-                     const cleanedKey = key.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim();
-                     newRow[cleanedKey] = row[key];
-                 });
-                 return newRow;
-             });
-             setSettings(processSettingsData(sanitizedSettingsRaw as RawSettingData[]));
-         }
+        const responRaw = dataContainer.respon || [];
+        if (Array.isArray(responRaw)) {
+            setSupervisorAttendance(processSupervisorAttendanceData(responRaw as RawSupervisorAttendanceData[], currentSupervisors));
+            setSupervisorAttendanceReport(processSupervisorAttendanceReportData(responRaw as RawSupervisorAttendanceData[], currentSupervisors));
+        }
     };
 
-    const loadFromCache = async () => {
-        try {
-            const cached = await getFromDB(CACHE_KEY);
-            if (cached) {
-                processAllData(cached);
-                setIsLoading(false);
-                return true;
-            }
-        } catch (e) {
-            console.warn("Failed to load from cache", e);
+    // جلب البيانات: أولاً بيانات اليوم فقط (خفيفة وسريعة)، والسجل الكامل يُجلب عند فتح صفحات التقارير
+    const fetchData = async (full: boolean) => {
+        const url = full ? API_URL : `${API_URL}?mode=today`;
+        const allDataJson = await hedgedFetchJson(
+            () => fetch(`${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`),
+            full
+                ? { hedgeAfterMs: 90000, maxAttempts: 2, totalTimeoutMs: 180000 }
+                : { hedgeAfterMs: 3000, maxAttempts: 5, totalTimeoutMs: 60000 }
+        );
+        if (!(allDataJson && allDataJson.success && allDataJson.data)) {
+            throw new Error('استجابة غير صالحة من الخادم');
         }
-        return false;
-    };
-
-    const saveToCache = async (data: any) => {
-        try {
-            await saveToDB(CACHE_KEY, data);
-        } catch (e) {
-            console.warn("Failed to save to cache (Quota Exceeded)", e);
-        }
+        processAllData(allDataJson.data);
+        setLiveReady(true);
+        const isLight = allDataJson.mode === 'today';
+        if (full || !isLight) setFullLoaded(true);
     };
 
     const loadData = async () => {
         setError(null);
-        const loadedFromCache = await loadFromCache();
-        
-        if (loadedFromCache) {
-             setIsBackgroundUpdating(true);
+        setLiveLoadFailed(false);
+        if (initialData) {
+            // نعرض الأسماء فوراً، لكن بدون حالات الحضور القديمة المخزنة في الكود
+            processAllData({ ...(initialData as any), attandance: [], respon: [] });
+            setIsLoading(false);
         } else {
             setIsLoading(true);
-            setLoadingMessage("جاري جلب البيانات من قاعدة البيانات...");
         }
-        
-        const cacheBuster = `&v=${new Date().getTime()}`;
+
         try {
-            const allDataJson = await fetchWithRetry(`${API_URL}?${cacheBuster.substring(1)}`);
-            if (!allDataJson.success) {
-                throw new Error("فشل في جلب البيانات من المصدر");
-            }
-            const dataContainer = allDataJson.data || {};
-            processAllData(dataContainer);
-            saveToCache(dataContainer);
-            if (loadedFromCache) {
-                setNotification({ message: 'تم تحديث البيانات بنجاح.', type: 'success' });
-            }
+            await fetchData(false);
         } catch (err) {
-            console.error("فشل في جلب البيانات:", err);
-            if (!loadedFromCache) {
-                const msg = err instanceof Error ? err.message : "حدث خطأ غير متوقع";
-                setError(msg.includes('aborted') ? "انتهت مهلة الاتصال بالسيرفر." : msg);
+            const msg = err instanceof Error ? err.message : "حدث خطأ غير متوقع";
+            if (!initialData) {
+                setError(msg);
             } else {
-                setNotification({ message: 'فشل تحديث البيانات في الخلفية. يتم عرض نسخة مخزنة.', type: 'error' });
+                setLiveLoadFailed(true);
             }
         } finally {
             setIsLoading(false);
-            setIsBackgroundUpdating(false);
+        }
+    };
+
+    const ensureFullData = async () => {
+        if (fullLoaded) return;
+        try {
+            await fetchData(true);
+        } catch (err) {
+            setNotification({ message: 'تعذّر تحميل السجل الكامل للتقارير', type: 'error' });
         }
     };
 
@@ -897,80 +533,99 @@ const App: React.FC = () => {
                 body: JSON.stringify(data),
             });
         } catch (err) {
-            if (err instanceof TypeError && err.message.includes('Failed to fetch')) {} 
-            else {
+            if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+                // Google Apps Script CORS redirect normal behavior
+            } else {
                 setNotification({ message: 'فشل في إرسال التقييم.', type: 'error' });
                 setIsSubmitting(false);
                 return;
             }
         }
+
+        // Optimistically add the new evaluation to state so it appears immediately
+        const maxScore = evalQuestions.reduce((sum, q) => sum + q.mark, 0);
+        let totalScore = 0;
+        const scores = evalQuestions.map(q => {
+            const header = evalHeaderMap.get(q.id) || q.que.trim();
+            const score = Number(data[header]) || 0;
+            totalScore += score;
+            return {
+                question: q.que,
+                score,
+                maxMark: q.mark,
+            };
+        });
+
+        const newResult: ProcessedEvalResult = {
+            id: `${data['المعلم']}-${data['الحلقة']}-${Date.now()}`,
+            teacherName: String(data['المعلم'] || ''),
+            circleName: String(data['الحلقة'] || ''),
+            totalScore,
+            maxScore,
+            scores,
+        };
+
+        setEvalResults(prev => [newResult, ...prev].sort((a, b) => b.totalScore - a.totalScore));
         setNotification({ message: 'تم إرسال التقييم بنجاح!', type: 'success' });
         setIsSubmitting(false);
     };
 
-    const handlePostExam = async (data: ExamSubmissionData) => {
-        setIsSubmitting(true);
-        try {
-            const payload = { sheet: 'exam', ...data };
-            await fetch(API_URL, {
+    // إرسال إلى الشيت مع التحقق من نجاح العملية فعلاً
+    const postToSheet = async (payload: Record<string, any>) => {
+        // رقم طلب فريد: يسمح بإعادة الإرسال تلقائياً دون تكرار الصف في الشيت
+        const rid = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const body = JSON.stringify({ ...payload, rid });
+        const json = await hedgedFetchJson(
+            () => fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload),
-            });
-            setNotification({ message: `تم رصد درجة الطالب ${data['الطالب']} بنجاح!`, type: 'success' });
-        } catch (err) {
-            setNotification({ message: `تم رصد درجة الطالب ${data['الطالب']} بنجاح!`, type: 'success' });
-        } finally {
-            setIsSubmitting(false);
+                body,
+            }),
+            { hedgeAfterMs: 6000, maxAttempts: 4, totalTimeoutMs: 60000 }
+        );
+        if (json && json.success === false) {
+            throw new Error(json.message || 'رفض الخادم العملية');
         }
     };
-    
+
     const handlePostTeacherAttendance = async (teacherId: number, teacherName: string, action: 'حضور' | 'انصراف') => {
-        setSubmittingTeacher(teacherName);
-        setIsSubmitting(true);
+        const current = teacherAttendance.find(r => r.teacherName === teacherName);
+        if (action === 'حضور' && current?.checkIn) {
+            setNotification({ message: `${teacherName} مسجَّل حضوره مسبقاً اليوم`, type: 'error' });
+            return;
+        }
+        if (action === 'انصراف' && current?.checkOut) {
+            setNotification({ message: `${teacherName} مسجَّل انصرافه مسبقاً اليوم`, type: 'error' });
+            return;
+        }
+        const previous = current ? { ...current } : null;
         const now = new Date();
+        setSubmittingTeacher(teacherName);
 
-        setTeacherAttendance(prevAttendance => 
-            prevAttendance.map(record => {
-                if (record.teacherName === teacherName) {
-                    const updatedRecord = { ...record };
-                    if (action === 'حضور') {
-                        updatedRecord.checkIn = now;
-                    } else {
-                        updatedRecord.checkOut = now;
-                    }
-
-                    if (updatedRecord.checkIn && updatedRecord.checkOut) {
-                        updatedRecord.status = 'مكتمل الحضور';
-                    } else if (updatedRecord.checkIn) {
-                        updatedRecord.status = 'حاضر';
-                    }
-                    return updatedRecord;
-                }
-                return record;
-            })
-        );
-
-        const payload = {
-            sheet: 'attandance',
-            "teacher_id": teacherId,
-            "name": teacherName,
-            "status": action,
-            "time": now.toISOString(),
-        };
+        // تحديث فوري للبطاقة بدون تعطيل بقية البطاقات
+        setTeacherAttendance(prev => prev.map(record => {
+            if (record.teacherName !== teacherName) return record;
+            const updated: any = { ...record };
+            if (action === 'حضور') updated.checkIn = now; else updated.checkOut = now;
+            if (updated.checkIn && updated.checkOut) updated.status = 'مكتمل الحضور';
+            else if (updated.checkIn) updated.status = 'حاضر';
+            return updated;
+        }));
 
         try {
-            await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload),
+            await postToSheet({
+                sheet: 'attandance',
+                "teacher_id": teacherId,
+                "name": teacherName,
+                "status": action,
+                "time": now.toISOString(),
             });
-            setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
+            setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح`, type: 'success' });
         } catch (err) {
-            setNotification({ message: `تم تسجيل ${action} للمعلم ${teacherName} بنجاح!`, type: 'success' });
+            if (previous) setTeacherAttendance(prev => prev.map(r => (r.teacherName === teacherName ? previous : r)));
+            setNotification({ message: `تعذّر تسجيل ${action} للمعلم ${teacherName} — تحقق من الاتصال وأعد المحاولة`, type: 'error' });
         } finally {
-            setIsSubmitting(false);
-            setSubmittingTeacher(null);
+            setSubmittingTeacher(cur => (cur === teacherName ? null : cur));
         }
     };
 
@@ -978,102 +633,50 @@ const App: React.FC = () => {
         const supervisor = supervisors.find(s => s.id === supervisorId);
         if (!supervisor) return;
         const supervisorName = supervisor.supervisorName;
-
-        setSubmittingSupervisor(supervisorName);
-        setIsSubmitting(true);
+        const current = supervisorAttendance.find(r => r.supervisorName === supervisorName);
+        if (action === 'حضور' && current?.checkIn) {
+            setNotification({ message: `${supervisorName} مسجَّل حضوره مسبقاً اليوم`, type: 'error' });
+            return;
+        }
+        if (action === 'انصراف' && current?.checkOut) {
+            setNotification({ message: `${supervisorName} مسجَّل انصرافه مسبقاً اليوم`, type: 'error' });
+            return;
+        }
+        const previous = current ? { ...current } : null;
         const now = new Date();
+        setSubmittingSupervisor(supervisorName);
 
-        setSupervisorAttendance(prevAttendance =>
-            prevAttendance.map(record => {
-                if (record.supervisorName === supervisorName) {
-                    const updatedRecord = { ...record };
-                    if (action === 'حضور') {
-                        updatedRecord.checkIn = now;
-                    } else {
-                        updatedRecord.checkOut = now;
-                    }
+        setSupervisorAttendance(prev => prev.map(record => {
+            if (record.supervisorName !== supervisorName) return record;
+            const updated: any = { ...record };
+            if (action === 'حضور') updated.checkIn = now; else updated.checkOut = now;
+            if (updated.checkIn && updated.checkOut) updated.status = 'مكتمل الحضور';
+            else if (updated.checkIn) updated.status = 'حاضر';
+            return updated;
+        }));
 
-                    if (updatedRecord.checkIn && updatedRecord.checkOut) {
-                        updatedRecord.status = 'مكتمل الحضور';
-                    } else if (updatedRecord.checkIn) {
-                        updatedRecord.status = 'حاضر';
-                    }
-                    return updatedRecord;
-                }
-                return record;
-            })
-        );
-
-        const payload = {
-            sheet: 'respon',
-            "id": supervisorId,
-            "name": supervisorName,
-            "status": action,
-            "time": now.toISOString(),
-        };
         try {
-            await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload),
+            await postToSheet({
+                sheet: 'respon',
+                "id": supervisorId,
+                "name": supervisorName,
+                "status": action,
+                "time": now.toISOString(),
             });
-            setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
+            setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح`, type: 'success' });
         } catch (err) {
-            setNotification({ message: `تم تسجيل ${action} للمشرف ${supervisorName} بنجاح!`, type: 'success' });
+            if (previous) setSupervisorAttendance(prev => prev.map(r => (r.supervisorName === supervisorName ? previous : r)));
+            setNotification({ message: `تعذّر تسجيل ${action} للمشرف ${supervisorName} — تحقق من الاتصال وأعد المحاولة`, type: 'error' });
         } finally {
-            setIsSubmitting(false);
-            setSubmittingSupervisor(null);
-        }
-    };
-
-    const handlePostSettings = async (data: ProcessedSettingsData) => {
-        setIsSubmitting(true);
-        try {
-            const payload = {
-                sheet: 'setting',
-                keyField: 'الرقم',
-                "الرقم": 1, 
-                "اليوم الافتراضي": data.default_student_count_day,
-                "وقت تأخر حضور المعلمين": data.teacher_late_checkin_time || '',
-                "وقت انصراف مبكر للمعلمين": data.teacher_early_checkout_time || '',
-                "وقت تأخر حضور المشرفين": data.supervisor_late_checkin_time || '',
-                "وقت انصراف مبكر للمشرفين": data.supervisor_early_checkout_time || '',
-            };
-            await fetch(`${API_URL}?action=updateSettings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload),
-            });
-            setNotification({ message: 'تم حفظ الإعدادات بنجاح!', type: 'success' });
-        } catch (err) {
-            setNotification({ message: 'تم حفظ الإعدادات بنجاح!', type: 'success' });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleRefreshTeacherData = async () => {
-        setIsBackgroundUpdating(true);
-        try {
-            const allDataJson = await fetchWithRetry(`${API_URL}?v=${new Date().getTime()}`);
-            if (!allDataJson.success) {
-                throw new Error("فشل في جلب البيانات من المصدر");
-            }
-            const dataContainer = allDataJson.data || {};
-            processAllData(dataContainer);
-            saveToCache(dataContainer);
-            setNotification({ message: 'تم تحديث البيانات بنجاح.', type: 'success' });
-        } catch (e) {
-            setNotification({ message: 'حدث خطأ أثناء تحديث البيانات.', type: 'error' });
-        } finally {
-            setIsBackgroundUpdating(false);
+            setSubmittingSupervisor(cur => (cur === supervisorName ? null : cur));
         }
     };
 
     const handleNavigation = (page: Page) => {
-        setInitialStudentFilter(null);
-        setInitialDailyStudentFilter(null);
-        if (!authenticatedUser && ['evaluation', 'evaluationReport', 'exam', 'settings'].includes(page)) {
+        if (['teacherAttendanceReport', 'supervisorAttendanceReport', 'evaluationReport'].includes(page)) {
+            ensureFullData();
+        }
+        if (!authenticatedUser && ['evaluation', 'evaluationReport'].includes(page)) {
             setCurrentPage(page);
             setShowPasswordModal(true);
             setIsMobileSidebarOpen(false);
@@ -1084,28 +687,18 @@ const App: React.FC = () => {
         setIsMobileSidebarOpen(false);
     };
 
-    const handleCircleSelect = (circleName: string) => {
-        setInitialStudentFilter({ circle: circleName });
-        setCurrentPage('students');
-    };
-
-    const handleDailyCircleSelect = (circleName: string) => {
-        setInitialDailyStudentFilter({ circle: circleName });
-        setCurrentPage('dailyStudents');
-    };
-    
     if (isLoading) {
         return (
             <div className="flex flex-col justify-center items-center h-screen bg-stone-50">
-                <img src={LOGO_URL} alt="شعار المجمع" className="w-32 h-32 animate-pulse mb-6" />
-                <div className="flex items-center gap-3 text-stone-700 font-semibold text-lg mb-2">
+                <img src={LOGO_URL} alt="شعار المجمع" className="w-28 h-28 animate-pulse mb-4" />
+                <div className="flex items-center gap-3 text-stone-700 font-semibold text-lg">
                     <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
                     <p>{loadingMessage}</p>
                 </div>
             </div>
         );
     }
-    
+
     if (error) {
         return (
             <div className="flex flex-col justify-center items-center h-screen bg-red-50 p-4 text-center">
@@ -1118,97 +711,160 @@ const App: React.FC = () => {
         );
     }
 
-    const titles = {
-        students: 'تقرير الطلاب',
-        circles: 'تقرير الحلقات',
-        general: 'التقرير العام',
-        dashboard: 'متابعة الحلقات',
-        dailyDashboard: 'متابعة الحلقات (يومي)',
-        notes: 'ملاحظات الطلاب',
-        evaluation: `زيارات الحلقات ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
-        evaluationReport: 'تقارير زيارات المعلمين',
-        excellence: 'تميز الحلقات',
-        combinedAttendance: `حضور الموظفين`,
+    const titles: Record<Page, string> = {
+        combinedAttendance: 'حضور المعلمين والمشرفين',
         teacherAttendanceReport: 'تقرير حضور المعلمين',
         supervisorAttendanceReport: 'تقرير حضور المشرفين',
-        dailyStudents: 'التقرير اليومي (طلاب)',
-        dailyCircles: 'التقرير اليومي (حلقات)',
-        exam: `إدخال درجات الاختبار ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
-        examReport: 'تقرير الاختبارات',
-        studentFollowUp: 'متابعة طالب',
-        studentAttendanceReport: 'تقرير حضور الطلاب اليومي',
-        studentAbsenceReport: 'تقرير غياب الطلاب',
-        settings: 'الإعدادات',
-        teacherList: 'قائمة المعلمين',
+        evaluation: `زيارة معلم حلقة ${authenticatedUser ? `- ${authenticatedUser.name}` : ''}`,
+        evaluationReport: 'تقارير زيارات المعلمين',
     };
 
     const renderPage = () => {
         switch (currentPage) {
-            case 'students':
-                return <StudentReportPage students={students} initialFilter={initialStudentFilter} clearInitialFilter={() => setInitialStudentFilter(null)} />;
-            case 'circles':
-                return <CircleReportPage students={students} supervisors={supervisors} />;
-            case 'general':
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
-            case 'dashboard':
-                return <DashboardPage students={students} onCircleSelect={handleCircleSelect} supervisors={supervisors} />;
-            case 'dailyDashboard':
-                return <DailyDashboardPage students={dailyStudents} onCircleSelect={handleDailyCircleSelect} supervisors={supervisors} />;
-            case 'notes':
-                return <NotesPage students={students} />;
-            case 'evaluation':
-                return authenticatedUser && <EvaluationPage onSubmit={handlePostEvaluation} isSubmitting={isSubmitting} authenticatedUser={authenticatedUser} evalQuestions={evalQuestions} evalResults={evalResults} evalHeaderMap={evalHeaderMap} allTeachers={teachersInfo} onSelectReport={(r) => { setSelectedEvalReport(r); setCurrentPage('evaluationReport'); }} />;
-            case 'evaluationReport':
-                return <EvaluationReportPage evalResults={evalResults} authenticatedUser={authenticatedUser} key={selectedEvalReport?.id || 'list'} initialSelectedReport={selectedEvalReport} />;
-            case 'excellence':
-                return <ExcellencePage students={students} supervisors={supervisors} />;
             case 'combinedAttendance':
-                return <CombinedAttendancePage allTeachers={asrTeachersInfo} teacherAttendanceStatus={teacherAttendance} onTeacherSubmit={handlePostTeacherAttendance} submittingTeacher={submittingTeacher} allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))} supervisorAttendanceStatus={supervisorAttendance} onSupervisorSubmit={handlePostSupervisorAttendance} submittingSupervisor={submittingSupervisor} isSubmitting={isSubmitting} authenticatedUser={authenticatedUser} />;
+                return (
+                    <CombinedAttendancePage
+                        allTeachers={asrTeachersInfo}
+                        teacherAttendanceStatus={teacherAttendance}
+                        onTeacherSubmit={handlePostTeacherAttendance}
+                        submittingTeacher={submittingTeacher}
+                        allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))}
+                        supervisorAttendanceStatus={supervisorAttendance}
+                        onSupervisorSubmit={handlePostSupervisorAttendance}
+                        submittingSupervisor={submittingSupervisor}
+                        isSubmitting={!liveReady}
+                        authenticatedUser={authenticatedUser}
+                    />
+                );
             case 'teacherAttendanceReport':
-                return <TeacherAttendanceReportPage reportData={combinedTeacherAttendanceLog} onRefresh={handleRefreshTeacherData} isRefreshing={isBackgroundUpdating} />;
+                return (
+                    <TeacherAttendanceReportPage
+                        reportData={combinedTeacherAttendanceLog}
+                    />
+                );
             case 'supervisorAttendanceReport':
-                return <SupervisorAttendanceReportPage reportData={supervisorAttendanceReport} />;
-            case 'dailyStudents':
-                return <DailyStudentReportPage students={dailyStudents} />;
-            case 'dailyCircles':
-                return <DailyCircleReportPage students={dailyStudents} supervisors={supervisors} />;
-            case 'exam':
-                // FIX: Corrected typo handlePostPostExam to handlePostExam
-                return authenticatedUser && <ExamPage onSubmit={handlePostExam} isSubmitting={isSubmitting} students={registeredStudents} authenticatedUser={authenticatedUser} />;
-            case 'examReport':
-                return <ExamReportPage examData={examData} />;
-            case 'studentFollowUp':
-                return <StudentFollowUpPage students={students} />;
-            case 'studentAttendanceReport':
-                return <StudentAttendanceReportPage students={dailyStudents} />;
-            case 'studentAbsenceReport':
-                return <StudentAbsenceReportPage students={dailyStudents} />;
-            case 'settings':
-                return authenticatedUser && <SettingsPage settings={settings} onSave={handlePostSettings} isSubmitting={isSubmitting} dailyStudents={dailyStudents} />;
-            case 'teacherList':
-                return <TeacherListPage students={students} />;
+                return (
+                    <SupervisorAttendanceReportPage
+                        reportData={supervisorAttendanceReport}
+                    />
+                );
+            case 'evaluation':
+                return authenticatedUser ? (
+                    <EvaluationPage
+                        onSubmit={handlePostEvaluation}
+                        isSubmitting={isSubmitting}
+                        authenticatedUser={authenticatedUser}
+                        evalQuestions={evalQuestions}
+                        evalResults={evalResults}
+                        evalHeaderMap={evalHeaderMap}
+                        allTeachers={teachersInfo}
+                        onSelectReport={(r) => {
+                            setSelectedEvalReport(r);
+                            setCurrentPage('evaluationReport');
+                        }}
+                    />
+                ) : null;
+            case 'evaluationReport':
+                return (
+                    <EvaluationReportPage
+                        evalResults={evalResults}
+                        authenticatedUser={authenticatedUser}
+                        key={selectedEvalReport?.id || 'list'}
+                        initialSelectedReport={selectedEvalReport}
+                    />
+                );
             default:
-                return <GeneralReportPage students={students} dailyStudents={dailyStudents} settings={settings} />;
+                return (
+                    <CombinedAttendancePage
+                        allTeachers={asrTeachersInfo}
+                        teacherAttendanceStatus={teacherAttendance}
+                        onTeacherSubmit={handlePostTeacherAttendance}
+                        submittingTeacher={submittingTeacher}
+                        allSupervisors={supervisors.map(s => ({ id: s.id, name: s.supervisorName }))}
+                        supervisorAttendanceStatus={supervisorAttendance}
+                        onSupervisorSubmit={handlePostSupervisorAttendance}
+                        submittingSupervisor={submittingSupervisor}
+                        isSubmitting={!liveReady}
+                        authenticatedUser={authenticatedUser}
+                    />
+                );
         }
     };
-    
+
     return (
         <div className="flex h-screen bg-stone-100" dir="rtl">
             <div className={`print-hidden lg:flex lg:flex-shrink-0 fixed lg:relative inset-y-0 right-0 z-40 transition-transform duration-300 ease-in-out ${isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0`}>
-                <Sidebar currentPage={currentPage} onNavigate={handleNavigation} isCollapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(prev => !prev)} authenticatedUser={authenticatedUser} />
+                <Sidebar
+                    currentPage={currentPage}
+                    onNavigate={handleNavigation}
+                    isCollapsed={isSidebarCollapsed}
+                    onToggle={() => setIsSidebarCollapsed(prev => !prev)}
+                    authenticatedUser={authenticatedUser}
+                />
             </div>
             {isMobileSidebarOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)}></div>}
-            <main className={`flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300`}>
-                <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-4 md:p-6 border-b border-stone-200 flex justify-between items-center">
-                     <div className="flex items-center gap-3">
+            <main className="flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300">
+                <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-20 p-4 md:px-6 border-b border-stone-200 flex justify-between items-center print-hidden">
+                    <div className="flex items-center gap-3">
                         <h1 className="text-xl md:text-2xl font-bold text-stone-800">{titles[currentPage]}</h1>
-                        {isBackgroundUpdating && <span className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-100 px-2 py-1 rounded-full animate-pulse">جاري التحديث...</span>}
                     </div>
-                    <button className="lg:hidden p-2 text-stone-600 hover:bg-stone-100 rounded-md" onClick={() => setIsMobileSidebarOpen(true)}><MenuIcon className="w-6 h-6" /></button>
+                    <div className="flex items-center gap-2">
+                        {authenticatedUser ? (
+                            <button
+                                onClick={() => {
+                                    setAuthenticatedUser(null);
+                                    if (['evaluation', 'evaluationReport'].includes(currentPage)) {
+                                        setCurrentPage('combinedAttendance');
+                                    }
+                                }}
+                                className="px-3 py-1.5 text-xs font-bold text-stone-700 bg-stone-200 hover:bg-stone-300 rounded-lg transition-colors"
+                            >
+                                خروج ({authenticatedUser.name})
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setShowPasswordModal(true)}
+                                className="px-3 py-1.5 text-xs font-bold text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-lg transition-colors"
+                            >
+                                دخول المشرفين
+                            </button>
+                        )}
+                        <button
+                            className="lg:hidden p-2 text-stone-600 hover:bg-stone-100 rounded-md"
+                            onClick={() => setIsMobileSidebarOpen(true)}
+                        >
+                            <MenuIcon className="w-6 h-6" />
+                        </button>
+                    </div>
                 </header>
-                <div className="p-4 md:p-6">{renderPage()}</div>
+                <div className="p-4 md:p-6">{currentPage === 'combinedAttendance' && !liveReady && (
+                            <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm font-semibold text-center">
+                                {liveLoadFailed ? (
+                                    <span>تعذّر جلب حالة الحضور من الشيت. <button onClick={() => loadData()} className="underline font-bold">إعادة المحاولة</button></span>
+                                ) : (
+                                    <span className="animate-pulse">جاري جلب حالة الحضور لليوم من الشيت... ستتفعّل الأزرار تلقائياً</span>
+                                )}
+                            </div>
+                        )}
+                        {renderPage()}</div>
             </main>
-            {showPasswordModal && <PasswordModal onSuccess={(user) => { setAuthenticatedUser(user); setShowPasswordModal(false); }} onClose={() => { setShowPasswordModal(false); if (['evaluation', 'exam', 'settings'].includes(currentPage)) setCurrentPage('general'); }} supervisors={supervisors} productors={productors} teachersInfo={teachersInfo} />}
+            {showPasswordModal && (
+                <PasswordModal
+                    onSuccess={(user) => {
+                        setAuthenticatedUser(user);
+                        setShowPasswordModal(false);
+                    }}
+                    onClose={() => {
+                        setShowPasswordModal(false);
+                        if (['evaluation', 'evaluationReport'].includes(currentPage)) {
+                            setCurrentPage('combinedAttendance');
+                        }
+                    }}
+                    supervisors={supervisors}
+                    productors={productors}
+                    teachersInfo={teachersInfo}
+                />
+            )}
             <Notification notification={notification} onClose={() => setNotification(null)} />
         </div>
     );
